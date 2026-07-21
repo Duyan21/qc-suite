@@ -1,0 +1,21 @@
+services:
+  db:
+    image: ankane/pgvector
+    container_name: qcsuite_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: qcsuite
+      POSTGRES_PASSWORD: qcsuite123
+      POSTGRES_DB: qcsuite_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - qcsuite_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qcsuite -d qcsuite_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  qcsuite_db_data:
