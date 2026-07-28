@@ -1,10 +1,10 @@
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function SearchPage() {
+export function TestRunPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Search</CardTitle>
+        <CardTitle>Test Runs</CardTitle>
       </CardHeader>
     </Card>
   )

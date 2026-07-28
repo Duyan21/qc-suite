@@ -1,10 +1,10 @@
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function AgentPage() {
+export function SemanticSearchPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Impact Agent</CardTitle>
+        <CardTitle>Semantic Search</CardTitle>
       </CardHeader>
     </Card>
   )

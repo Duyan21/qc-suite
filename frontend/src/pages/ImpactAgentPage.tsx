@@ -1,10 +1,10 @@
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function ReportPage() {
+export function ImpactAgentPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Release Report</CardTitle>
+        <CardTitle>Impact Agent</CardTitle>
       </CardHeader>
     </Card>
   )
