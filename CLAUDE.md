@@ -98,20 +98,45 @@ qc-suite/
 │ └── migrations/ # Alembic files
 ├── frontend/
 │ └── src/
-│ ├── components/ui/ # shadcn/ui components (Button, Card, ...)
-│ ├── layouts/ # AppLayout.tsx — sidebar nav + <Outlet/>
-│ ├── pages/ # one file per route (RequirementsPage.tsx, ...)
-│ ├── lib/ # utils.ts (cn() helper)
-│ └── App.tsx # react-router-dom route tree
+│ ├── components/ui/ # shadcn/ui components (Button, Card, Input, Label, Checkbox, ...)
+│ ├── layouts/ # AppLayout (sidebar chrome), AuthLayout (auth card chrome), RequireAuth (route guard)
+│ ├── pages/ # one file per route (RequirementsPage.tsx, LoginPage.tsx, ...)
+│ ├── lib/ # utils.ts (cn() helper), auth.ts (mocked login/register/reset)
+│ ├── nav.tsx # single source of truth: nav sections + routes
+│ └── App.tsx # react-router-dom route tree (generated from nav.tsx)
 └── docs/
 └── erd.md
 
 ### Frontend Routes
-`/login` (standalone, no sidebar) + 8 routes under `AppLayout`:
-`/requirements`, `/testcases`, `/defects`, `/traceability`, `/search`, `/agent`, `/report`, `/admin`.
-Bare `/` redirects to `/requirements`. All currently placeholder pages (Sprint 0) —
+`/login`, `/register`, `/forgot-password` (standalone, no sidebar) + 10 routes
+under `AppLayout`, grouped into 5 sidebar sections defined in `nav.tsx`:
+
+| Section | Routes |
+|---|---|
+| Overview | `/dashboard` |
+| Quản lý | `/requirements`, `/testcases`, `/defects`, `/traceability` |
+| AI Tools | `/search`, `/agent` |
+| Release | `/testruns`, `/report` |
+| System | `/admin` |
+
+Bare `/` redirects to `/dashboard`. All currently placeholder pages (Sprint 0) —
 real content/data fetching lands in later sprints. No `api/` dir yet; add one
 when the first real endpoint integration starts.
+
+`App.tsx` does not hand-list the `AppLayout` routes — it derives `<Route>`
+elements by mapping over `nav.tsx`'s `NAV_SECTIONS` (each item carries `path` +
+`label` + `element`), so the sidebar and router can't drift out of sync. Only
+the auth routes and the `index` redirect are declared separately, since none
+of those are nav items.
+
+### Auth (mocked, Sprint 0)
+`src/lib/auth.ts` fakes `login`/`register`/`requestPasswordReset` against a
+single hardcoded demo user (`admin@homelending.com` / `password123`) and
+stores a fake token under `localStorage["qms_token"]` — there's no backend
+`/auth` endpoint yet. `RequireAuth` (`src/layouts/RequireAuth.tsx`) wraps the
+`AppLayout` route and redirects to `/login` when that key is absent. Swap
+`auth.ts`'s internals for real `fetch` calls once the FastAPI auth endpoints
+land; `RequireAuth` and the calling pages shouldn't need to change.
 
 Import alias `@/*` → `src/*` (wired in `tsconfig.json`, `tsconfig.app.json`, and
 `vite.config.ts`). Use it instead of relative `../` imports. Note: `tsconfig.app.json`
