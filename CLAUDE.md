@@ -98,11 +98,25 @@ qc-suite/
 │ └── migrations/ # Alembic files
 ├── frontend/
 │ └── src/
-│ ├── components/
-│ ├── pages/
-│ └── api/ # API call functions
+│ ├── components/ui/ # shadcn/ui components (Button, Card, ...)
+│ ├── layouts/ # AppLayout.tsx — sidebar nav + <Outlet/>
+│ ├── pages/ # one file per route (RequirementsPage.tsx, ...)
+│ ├── lib/ # utils.ts (cn() helper)
+│ └── App.tsx # react-router-dom route tree
 └── docs/
 └── erd.md
+
+### Frontend Routes
+`/login` (standalone, no sidebar) + 8 routes under `AppLayout`:
+`/requirements`, `/testcases`, `/defects`, `/traceability`, `/search`, `/agent`, `/report`, `/admin`.
+Bare `/` redirects to `/requirements`. All currently placeholder pages (Sprint 0) —
+real content/data fetching lands in later sprints. No `api/` dir yet; add one
+when the first real endpoint integration starts.
+
+Import alias `@/*` → `src/*` (wired in `tsconfig.json`, `tsconfig.app.json`, and
+`vite.config.ts`). Use it instead of relative `../` imports. Note: `tsconfig.app.json`
+must NOT get a `baseUrl` key — TypeScript 6.0 deprecates it and `tsc -b` fails the
+build (TS5101); `paths` alone works fine under `moduleResolution: "bundler"`.
 
 ## Coding Conventions
 - Python: snake_case, type hints required
