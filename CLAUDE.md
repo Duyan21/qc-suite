@@ -104,7 +104,9 @@ qc-suite/
 │ ├── lib/ # utils.ts (cn() helper)
 │ └── App.tsx # react-router-dom route tree
 └── docs/
-└── erd.md
+├── erd.md
+└── superpowers/ # design specs (specs/) and implementation plans (plans/)
+
 
 ### Frontend Routes
 `/login` (standalone, no sidebar) + 8 routes under `AppLayout`:
