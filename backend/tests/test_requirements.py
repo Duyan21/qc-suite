@@ -91,3 +91,22 @@ def test_update_requirement_creates_new_version_and_history_has_three(client, au
 def test_requirements_require_auth(client):
     response = client.get("/requirements")
     assert response.status_code == 401
+
+
+def test_list_requirements_paginates_across_pages(client, auth_headers):
+    r1 = _create_requirement(client, auth_headers, title="Req One").json()
+    r2 = _create_requirement(client, auth_headers, title="Req Two").json()
+    r3 = _create_requirement(client, auth_headers, title="Req Three").json()
+
+    page1 = client.get("/requirements?page=1&limit=2", headers=auth_headers).json()
+    assert page1["total"] == 3
+    assert len(page1["items"]) == 2
+    page1_ids = [item["id"] for item in page1["items"]]
+    assert page1_ids == [r1["id"], r2["id"]]
+
+    page2 = client.get("/requirements?page=2&limit=2", headers=auth_headers).json()
+    assert page2["total"] == 3
+    assert len(page2["items"]) == 1
+    page2_ids = [item["id"] for item in page2["items"]]
+    assert page2_ids == [r3["id"]]
+    assert not set(page2_ids) & set(page1_ids)

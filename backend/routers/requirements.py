@@ -21,15 +21,15 @@ router = APIRouter(
 
 @router.get("", response_model=RequirementListResponse)
 def list_requirements(
-    status: str | None = None,
+    status_filter: str | None = Query(None, alias="status"),
     search: str | None = None,
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
     query = db.query(Requirement).filter(Requirement.is_current == True)
-    if status is not None:
-        query = query.filter(Requirement.status == status)
+    if status_filter is not None:
+        query = query.filter(Requirement.status == status_filter)
     if search is not None:
         query = query.filter(Requirement.title.ilike(f"%{search}%"))
 
