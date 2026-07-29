@@ -118,6 +118,51 @@ def test_get_defect_detail_includes_linked_summaries(client, auth_headers, db_se
     assert data["requirement"]["req_id"] == req.req_id
 
 
+def test_get_defect_detail_with_only_testcase_id_omits_requirement(client, auth_headers, db_session):
+    req = _create_requirement_row(db_session)
+    tc = _create_test_case_row(db_session, req.id)
+    created = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "High", "status": "Open", "testcase_id": tc.id},
+        headers=auth_headers,
+    ).json()
+
+    response = client.get(f"/defects/{created['id']}", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["test_case"]["code"] == tc.code
+    assert data["requirement"] is None
+
+
+def test_get_defect_detail_with_only_requirement_id_omits_test_case(client, auth_headers, db_session):
+    req = _create_requirement_row(db_session)
+    created = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "High", "status": "Open", "requirement_id": req.id},
+        headers=auth_headers,
+    ).json()
+
+    response = client.get(f"/defects/{created['id']}", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["requirement"]["req_id"] == req.req_id
+    assert data["test_case"] is None
+
+
+def test_get_defect_detail_with_no_links_omits_both(client, auth_headers):
+    created = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "High", "status": "Open"},
+        headers=auth_headers,
+    ).json()
+
+    response = client.get(f"/defects/{created['id']}", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["test_case"] is None
+    assert data["requirement"] is None
+
+
 def test_update_defect_changes_severity_status_fixed_in_version(client, auth_headers):
     created = client.post(
         "/defects",
