@@ -96,8 +96,7 @@ class TestRun(Base):
     __tablename__ = "test_runs"
 
     id = Column(Integer, primary_key=True)
-    release_id = Column(Integer, ForeignKey("releases.id"), nullable=True)
-    release_version = Column(String(50), nullable=False)
+    release_id = Column(Integer, ForeignKey("releases.id"), nullable=False)
     executed_at = Column(TIMESTAMP, server_default=func.now())
     executed_by = Column(String(100))
     note = Column(Text)
