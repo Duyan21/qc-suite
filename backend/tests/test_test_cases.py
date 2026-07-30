@@ -2,6 +2,11 @@ from models.all_models import Project, Release, Requirement
 
 
 def _create_requirement_row(db_session, **overrides):
+    project = Project(name="Home Lending", description="d")
+    db_session.add(project)
+    db_session.commit()
+    db_session.refresh(project)
+
     defaults = dict(
         req_id="REQ-001",
         version=1,
@@ -9,6 +14,7 @@ def _create_requirement_row(db_session, **overrides):
         description="d",
         status="Active",
         is_current=True,
+        project_id=project.id,
     )
     defaults.update(overrides)
     req = Requirement(**defaults)

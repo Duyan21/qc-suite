@@ -10,6 +10,7 @@ class RequirementCreate(BaseModel):
     title: str
     description: str
     status: RequirementStatus = "Draft"
+    project_id: int
 
 
 class RequirementUpdate(BaseModel):
@@ -30,6 +31,7 @@ class RequirementResponse(BaseModel):
     change_note: str | None
     changed_by: str | None
     previous_version_id: int | None
+    project_id: int
     created_at: datetime
 
     class Config:
