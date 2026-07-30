@@ -104,8 +104,7 @@ qc-suite/
 │ ├── lib/ # utils.ts (cn() helper)
 │ └── App.tsx # react-router-dom route tree
 └── docs/
-├── erd.md
-└── superpowers/ # design specs (specs/) and implementation plans (plans/)
+└── erd.md
 
 
 ### Frontend Routes
