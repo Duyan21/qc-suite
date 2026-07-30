@@ -9,6 +9,8 @@ from sqlalchemy.orm import sessionmaker
 
 from main import app
 from models.base import engine, get_db
+from models.all_models import User
+from services.auth_service import create_access_token
 
 
 @pytest.fixture()
@@ -37,3 +39,22 @@ def client(db_session):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def test_user(db_session):
+    user = User(
+        email="qc.engineer@example.com",
+        hashed_password="not-used-in-tests",
+        full_name="QC Engineer",
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture()
+def auth_headers(test_user):
+    token = create_access_token(test_user.id)
+    return {"Authorization": f"Bearer {token}"}

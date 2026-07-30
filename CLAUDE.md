@@ -106,6 +106,7 @@ qc-suite/
 └── docs/
 └── erd.md
 
+
 ### Frontend Routes
 `/login` (standalone, no sidebar) + 8 routes under `AppLayout`:
 `/requirements`, `/testcases`, `/defects`, `/traceability`, `/search`, `/agent`, `/report`, `/admin`.
