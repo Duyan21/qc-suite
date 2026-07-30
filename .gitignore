@@ -26,4 +26,5 @@ Thumbs.db
 .claude/tmp/
 .claude/*.log
 .claude/session/
+.claude/worktrees/
 .superpowers/
