@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from models.all_models import Requirement, User
+from models.all_models import Project, Requirement, User
 from models.base import get_db
 from schemas.requirements import (
     RequirementCreate,
@@ -53,6 +53,9 @@ def get_requirement(id: int, db: Session = Depends(get_db)):
 
 @router.post("", response_model=RequirementResponse, status_code=status.HTTP_201_CREATED)
 def create_requirement(payload: RequirementCreate, db: Session = Depends(get_db)):
+    if db.get(Project, payload.project_id) is None:
+        raise HTTPException(status_code=400, detail="project_id not found")
+
     req_id = next_code(db, Requirement, "req_id", "REQ")
     req = Requirement(
         req_id=req_id,
@@ -61,6 +64,7 @@ def create_requirement(payload: RequirementCreate, db: Session = Depends(get_db)
         description=payload.description,
         status=payload.status,
         is_current=True,
+        project_id=payload.project_id,
     )
     db.add(req)
     db.commit()
@@ -91,6 +95,7 @@ def update_requirement(
         change_note=payload.change_note,
         changed_by=current_user.email,
         previous_version_id=old.id,
+        project_id=old.project_id,
     )
     db.add(new)
     db.commit()

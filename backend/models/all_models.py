@@ -43,6 +43,7 @@ class Requirement(Base):
     )
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     req_id = Column(String(20), nullable=False)
     version = Column(Integer, nullable=False)
     title = Column(Text, nullable=False)

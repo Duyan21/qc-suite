@@ -1,24 +1,31 @@
-def _create_requirement(client, auth_headers, **overrides):
+def _create_requirement(client, auth_headers, project_id, **overrides):
     body = {
         "title": "User can log in",
         "description": "As a user, I want to log in with email and password",
         "status": "Draft",
+        "project_id": project_id,
     }
     body.update(overrides)
     return client.post("/requirements", json=body, headers=auth_headers)
 
 
-def test_create_requirement_generates_req_id_and_version_1(client, auth_headers):
-    response = _create_requirement(client, auth_headers)
+def test_create_requirement_rejects_unknown_project(client, auth_headers):
+    response = _create_requirement(client, auth_headers, project_id=999999)
+    assert response.status_code == 400
+
+
+def test_create_requirement_generates_req_id_and_version_1(client, auth_headers, project):
+    response = _create_requirement(client, auth_headers, project.id)
     assert response.status_code == 201
     data = response.json()
     assert data["req_id"] == "REQ-001"
     assert data["version"] == 1
     assert data["is_current"] is True
+    assert data["project_id"] == project.id
 
 
-def test_list_requirements_returns_only_current_versions(client, auth_headers):
-    _create_requirement(client, auth_headers)
+def test_list_requirements_returns_only_current_versions(client, auth_headers, project):
+    _create_requirement(client, auth_headers, project.id)
     response = client.get("/requirements", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
@@ -26,26 +33,26 @@ def test_list_requirements_returns_only_current_versions(client, auth_headers):
     assert data["items"][0]["is_current"] is True
 
 
-def test_list_requirements_filters_by_status(client, auth_headers):
-    _create_requirement(client, auth_headers, status="Draft")
-    _create_requirement(client, auth_headers, status="Active")
+def test_list_requirements_filters_by_status(client, auth_headers, project):
+    _create_requirement(client, auth_headers, project.id, status="Draft")
+    _create_requirement(client, auth_headers, project.id, status="Active")
     response = client.get("/requirements?status=Active", headers=auth_headers)
     data = response.json()
     assert data["total"] == 1
     assert data["items"][0]["status"] == "Active"
 
 
-def test_list_requirements_search_matches_title(client, auth_headers):
-    _create_requirement(client, auth_headers, title="OTP login flow")
-    _create_requirement(client, auth_headers, title="Password reset")
+def test_list_requirements_search_matches_title(client, auth_headers, project):
+    _create_requirement(client, auth_headers, project.id, title="OTP login flow")
+    _create_requirement(client, auth_headers, project.id, title="Password reset")
     response = client.get("/requirements?search=OTP", headers=auth_headers)
     data = response.json()
     assert data["total"] == 1
     assert "OTP" in data["items"][0]["title"]
 
 
-def test_get_requirement_detail_by_id(client, auth_headers):
-    created = _create_requirement(client, auth_headers).json()
+def test_get_requirement_detail_by_id(client, auth_headers, project):
+    created = _create_requirement(client, auth_headers, project.id).json()
     response = client.get(f"/requirements/{created['id']}", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["id"] == created["id"]
@@ -56,8 +63,8 @@ def test_get_requirement_detail_missing_returns_404(client, auth_headers):
     assert response.status_code == 404
 
 
-def test_update_requirement_creates_new_version_and_history_has_three(client, auth_headers):
-    v1 = _create_requirement(client, auth_headers).json()
+def test_update_requirement_creates_new_version_and_history_has_three(client, auth_headers, project):
+    v1 = _create_requirement(client, auth_headers, project.id).json()
 
     update_body = {
         "title": "User can log in (v2)",
@@ -93,10 +100,10 @@ def test_requirements_require_auth(client):
     assert response.status_code == 401
 
 
-def test_list_requirements_paginates_across_pages(client, auth_headers):
-    r1 = _create_requirement(client, auth_headers, title="Req One").json()
-    r2 = _create_requirement(client, auth_headers, title="Req Two").json()
-    r3 = _create_requirement(client, auth_headers, title="Req Three").json()
+def test_list_requirements_paginates_across_pages(client, auth_headers, project):
+    r1 = _create_requirement(client, auth_headers, project.id, title="Req One").json()
+    r2 = _create_requirement(client, auth_headers, project.id, title="Req Two").json()
+    r3 = _create_requirement(client, auth_headers, project.id, title="Req Three").json()
 
     page1 = client.get("/requirements?page=1&limit=2", headers=auth_headers).json()
     assert page1["total"] == 3
