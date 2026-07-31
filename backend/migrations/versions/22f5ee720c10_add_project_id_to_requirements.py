@@ -4,6 +4,14 @@ Revision ID: 22f5ee720c10
 Revises: 7a1e4c2f9b03
 Create Date: 2026-07-30 23:37:48.069205
 
+NOTE: this adds a NOT NULL `project_id` column with no server_default and
+no backfill, so `alembic upgrade head` will fail if the local `requirements`
+table already has rows (e.g. from manual testing). If that happens
+(dev-only, no production data exists yet), run:
+
+    TRUNCATE requirements CASCADE;
+
+then re-run `alembic upgrade head`.
 """
 from typing import Sequence, Union
 
