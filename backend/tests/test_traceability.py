@@ -141,3 +141,33 @@ def test_traceability_excludes_other_projects_and_old_versions(client, auth_head
     data = response.json()
     assert len(data["items"]) == 1
     assert data["items"][0]["version"] == 2
+
+
+def test_traceability_new_version_does_not_inherit_old_version_coverage(client, auth_headers, project, db_session):
+    old_version = _create_requirement(db_session, project.id, req_id="REQ-001", version=1, is_current=False)
+    tc = _create_test_case(db_session, old_version.id)
+
+    release = Release(project_id=project.id, version_name="v1.0.0")
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    _create_run_result(db_session, release.id, tc.id, "Pass")
+
+    _create_requirement(
+        db_session,
+        project.id,
+        req_id="REQ-001",
+        version=2,
+        is_current=True,
+        previous_version_id=old_version.id,
+    )
+
+    response = client.get(f"/traceability?project_id={project.id}", headers=auth_headers)
+    data = response.json()
+    assert len(data["items"]) == 1
+    item = data["items"][0]
+    assert item["version"] == 2
+    assert item["is_uncovered"] is True
+    assert item["coverage_percent"] == 0.0
+    assert item["test_cases"] == []
