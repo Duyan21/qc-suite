@@ -31,7 +31,7 @@ def _status_for_result(result: str | None) -> str:
 @router.get("", response_model=TraceabilityResponse)
 def get_traceability(project_id: int = Query(...), db: Session = Depends(get_db)):
     if db.get(Project, project_id) is None:
-        raise HTTPException(status_code=400, detail="project_id not found")
+        raise HTTPException(status_code=404, detail="project_id not found")
 
     requirements = (
         db.query(Requirement)
@@ -44,6 +44,7 @@ def get_traceability(project_id: int = Query(...), db: Session = Depends(get_db)
     test_cases = (
         db.query(TestCase)
         .filter(TestCase.requirement_id.in_(requirement_ids))
+        .order_by(TestCase.id)
         .all()
         if requirement_ids
         else []

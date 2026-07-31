@@ -53,7 +53,7 @@ def _create_run_result(db_session, release_id, testcase_id, result, **overrides)
 
 def test_traceability_rejects_unknown_project(client, auth_headers):
     response = client.get("/traceability?project_id=999999", headers=auth_headers)
-    assert response.status_code == 400
+    assert response.status_code == 404
 
 
 def test_traceability_requires_auth(client, project):
