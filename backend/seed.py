@@ -1,8 +1,15 @@
 """CLI script to populate the dev DB with demo data (Sprint 1 task S1-F).
 
+Data is sourced from the Home Lending BRS and QA artifacts in
+docs/Home_lending/ (50 requirements across 6 modules, 300 test cases,
+18 defects), pre-extracted into backend/seed_data/*.json by
+backend/seed_data/_extract.py.
+
 Run from backend/ with the venv active and the DB up:
     python seed.py
 """
+import json
+import os
 import random
 
 from models.all_models import (
@@ -16,35 +23,41 @@ from models.all_models import (
 )
 from models.base import SessionLocal
 
-PROJECT_NAME = "Home Lending Platform"
+PROJECT_NAME = "Home Lending System"
 
-REQ_GROUPS = [
-    "Loan Application Intake",
-    "Credit & Risk Assessment",
-    "Authentication & Account Access",
-    "Document Verification",
-    "Approval Workflow",
-    "Disbursement & Servicing",
-]
+SEED_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed_data")
 
-REQ_STATUSES = ["Active", "Active", "Active", "Draft", "Deprecated"]
-TC_PRIORITIES = ["High", "Medium", "Low"]
-TC_STATUSES = ["Active", "Active", "Active", "Draft", "Deprecated"]
-DEFECT_SEVERITIES = ["Critical", "High", "Medium", "Low"]
-DEFECT_STATUSES = ["Open", "Fixed", "Closed", "Wont-Fix"]
-EXECUTION_RESULTS = ["Pass", "Pass", "Pass", "Fail", "Skip", "Blocked"]
+# The versioning demo (append-only pattern) is grounded in a real BRS business
+# rule: "Income document must be issued within the last 3 months." REQ-013 is
+# seeded as v1 (6-month window, superseded) and v2 (3-month window, current).
+VERSIONED_REQ_ID = "REQ-013"
+VERSIONED_OLD_DESCRIPTION = (
+    "System verifies the applicant's income using payslips or bank "
+    "statements issued within the last 6 months."
+)
+VERSIONED_NEW_DESCRIPTION = (
+    "System verifies the applicant's income using payslips or bank "
+    "statements issued within the last 3 months, per updated compliance policy."
+)
 
-USER_LOGIN_POSITION = 15  # 1-based index into the 50 requirements
-NUM_REQUIREMENTS = 50
-NUM_TEST_CASES = 350
-NUM_DEFECTS = 50
-NUM_UNCOVERED_REQUIREMENTS = 3
+EXECUTION_RESULTS_WEIGHTED = ["Pass"] * 7 + ["Fail"] + ["Skip"] + ["Blocked"]
+OPEN_DEFECT_STATUSES = {"New", "Assigned", "In Progress", "Ready for Retest"}
+CLOSED_DEFECT_STATUSES = {"Fixed", "Closed"}
+
+
+def load_json(name):
+    with open(os.path.join(SEED_DATA_DIR, name), encoding="utf-8") as f:
+        return json.load(f)
 
 
 def seed_project(db):
     project = Project(
         name=PROJECT_NAME,
-        description="Consumer home lending origination and servicing platform.",
+        description=(
+            "End-to-end mortgage lifecycle platform: application, KYC, "
+            "income verification, property valuation, credit assessment, "
+            "approval, contract, disbursement, repayment, and loan closure."
+        ),
     )
     db.add(project)
     db.flush()
@@ -52,35 +65,27 @@ def seed_project(db):
 
 
 def seed_releases(db, project):
-    releases = []
-    for i in range(5):
-        release = Release(
-            project_id=project.id,
-            version_name=f"v2.{i}.0",
-            note=f"Release v2.{i}.0",
-        )
-        db.add(release)
-        releases.append(release)
+    releases = [
+        Release(project_id=project.id, version_name="v1.0.0-SIT", note="SIT build, first full regression pass."),
+        Release(project_id=project.id, version_name="v1.1.0-UAT", note="UAT candidate, includes AML and income-policy fixes."),
+        Release(project_id=project.id, version_name="v1.2.0-GA", note="General availability release."),
+    ]
+    db.add_all(releases)
     db.flush()
     return releases
 
 
-def seed_requirements(db, project):
-    requirements = []
-    for i in range(1, NUM_REQUIREMENTS + 1):
-        req_id = f"REQ-{i:03d}"
-        group = REQ_GROUPS[(i - 1) % len(REQ_GROUPS)]
-
-        if i == USER_LOGIN_POSITION:
+def seed_requirements(db, project, req_data):
+    requirements = {}
+    for row in req_data:
+        req_id = row["req_id"]
+        if req_id == VERSIONED_REQ_ID:
             v1 = Requirement(
                 project_id=project.id,
                 req_id=req_id,
                 version=1,
-                title="User Login",
-                description=(
-                    "As a registered user, I can log in with my email and "
-                    "password to access my loan dashboard."
-                ),
+                title=row["title"],
+                description=VERSIONED_OLD_DESCRIPTION,
                 status="Deprecated",
                 is_current=False,
             )
@@ -91,119 +96,125 @@ def seed_requirements(db, project):
                 project_id=project.id,
                 req_id=req_id,
                 version=2,
-                title="User Login",
-                description=(
-                    "As a registered user, I can log in with my email and "
-                    "password, then confirm a one-time passcode (OTP) sent "
-                    "to my phone before accessing my loan dashboard."
-                ),
+                title=row["title"],
+                description=VERSIONED_NEW_DESCRIPTION,
                 status="Active",
                 is_current=True,
-                change_note="Added OTP step after login incident.",
+                change_note="Tightened income document validity window from 6 months to 3 months per compliance policy update.",
                 changed_by="seed-script",
                 previous_version_id=v1.id,
             )
             db.add(v2)
-            requirements.append(v2)
+            requirements[req_id] = v2
             continue
 
         req = Requirement(
             project_id=project.id,
             req_id=req_id,
             version=1,
-            title=f"{group} - Feature {i}",
-            description=f"Requirement covering {group.lower()} scenario #{i}.",
-            status=random.choice(REQ_STATUSES),
+            title=row["title"],
+            description=row["description"],
+            status="Active",
             is_current=True,
         )
         db.add(req)
-        requirements.append(req)
+        requirements[req_id] = req
 
     db.flush()
     return requirements
 
 
-def seed_test_cases(db, requirements):
-    uncovered = set(random.sample(range(len(requirements)), NUM_UNCOVERED_REQUIREMENTS))
-
-    covered_requirements = [
-        req for idx, req in enumerate(requirements) if idx not in uncovered
-    ]
-
-    test_cases = []
-    counter = 1
-    while len(test_cases) < NUM_TEST_CASES:
-        for req in covered_requirements:
-            if len(test_cases) >= NUM_TEST_CASES:
-                break
-            tc = TestCase(
-                code=f"TC-{counter:03d}",
-                title=f"Verify {req.title} - case {counter}",
-                preconditions="User has a valid account and is on the relevant screen.",
-                steps="1. Navigate to the feature.\n2. Perform the action.\n3. Observe the result.",
-                expected_result="The system behaves as described in the requirement.",
-                priority=random.choice(TC_PRIORITIES),
-                status=random.choice(TC_STATUSES),
-                requirement_id=req.id,
-            )
-            db.add(tc)
-            test_cases.append(tc)
-            counter += 1
+def seed_test_cases(db, requirements, tc_data):
+    test_cases = {}
+    for row in tc_data:
+        req = requirements[row["req_id"]]
+        preconditions = f"{row['preconditions']} Test data: {row['test_data']}."
+        tc = TestCase(
+            code=row["tc_id"],
+            title=row["scenario"],
+            preconditions=preconditions,
+            steps=row["steps"],
+            expected_result=row["expected_result"],
+            priority=row["priority"],
+            status="Active",
+            requirement_id=req.id,
+        )
+        db.add(tc)
+        test_cases[row["tc_id"]] = tc
 
     db.flush()
     return test_cases
 
 
-def seed_defects(db, test_cases, requirements):
-    defects = []
-    for i in range(1, NUM_DEFECTS + 1):
-        testcase_id = None
-        requirement_id = None
-        if random.random() < 0.7:
-            testcase_id = random.choice(test_cases).id
-        if random.random() < 0.5:
-            requirement_id = random.choice(requirements).id
-
+def seed_defects(db, test_cases, requirements, defect_data, releases):
+    fixed_in = next(r for r in releases if r.version_name == "v1.1.0-UAT").version_name
+    defects = {}
+    for row in defect_data:
+        description = (
+            f"Steps to Reproduce: {row['steps_to_reproduce']}\n"
+            f"Expected: {row['expected_result']}\n"
+            f"Actual: {row['actual_result']}\n"
+            f"Root Cause: {row['root_cause']}\n"
+            f"Category: {row['category']} | Priority: {row['priority']} | "
+            f"Environment: {row['environment']}"
+        )
         defect = Defect(
-            code=f"DEF-{i:03d}",
-            title=f"Defect #{i} in demo data",
-            description=f"Auto-generated defect #{i} for seed/demo purposes.",
-            severity=random.choice(DEFECT_SEVERITIES),
-            status=random.choice(DEFECT_STATUSES),
-            testcase_id=testcase_id,
-            requirement_id=requirement_id,
-            found_in_version="v2.1.0",
+            code=row["def_id"],
+            title=row["summary"],
+            description=description,
+            severity=row["severity"],
+            status=row["status"],
+            testcase_id=test_cases[row["tc_id"]].id if row["tc_id"] else None,
+            requirement_id=requirements[row["req_id"]].id if row["req_id"] else None,
+            found_in_version=row["environment"],
+            fixed_in_version=fixed_in if row["status"] in CLOSED_DEFECT_STATUSES else None,
         )
         db.add(defect)
-        defects.append(defect)
+        defects[row["def_id"]] = defect
 
     db.flush()
     return defects
 
 
-def seed_test_runs(db, releases, test_cases):
-    target_releases = [r for r in releases if r.version_name in ("v2.3.0", "v2.4.0")]
+def seed_test_runs(db, releases, test_cases, defect_data):
+    """SIT run covers full regression; UAT run covers a targeted subset.
+    Results for defect-linked test cases are consistent with defect status
+    instead of random, so traceability data tells a coherent story.
+    """
+    defect_by_tc = {row["tc_id"]: row for row in defect_data if row["tc_id"]}
+
+    sit_release = next(r for r in releases if r.version_name == "v1.0.0-SIT")
+    uat_release = next(r for r in releases if r.version_name == "v1.1.0-UAT")
+
+    sit_run = TestRun(release_id=sit_release.id, executed_by="seed-script", note="SIT full regression run.")
+    uat_run = TestRun(release_id=uat_release.id, executed_by="seed-script", note="UAT targeted regression run.")
+    db.add_all([sit_run, uat_run])
+    db.flush()
 
     results = []
-    for release in target_releases:
-        run = TestRun(
-            release_id=release.id,
-            executed_by="seed-script",
-            note=f"Seed execution run for {release.version_name}",
-        )
-        db.add(run)
-        db.flush()
 
-        sample_size = max(1, int(len(test_cases) * 0.6))
-        for tc in random.sample(test_cases, sample_size):
-            result = TestRunResult(
-                run_id=run.id,
-                testcase_id=tc.id,
-                result=random.choice(EXECUTION_RESULTS),
-            )
-            db.add(result)
-            results.append(result)
+    for tc_id, tc in test_cases.items():
+        defect = defect_by_tc.get(tc_id)
+        if defect is not None:
+            result = "Fail"
+        else:
+            result = random.choice(EXECUTION_RESULTS_WEIGHTED)
+        results.append(TestRunResult(run_id=sit_run.id, testcase_id=tc.id, result=result))
 
+    uat_tc_ids = [
+        tc_id for tc_id in test_cases
+        if tc_id in defect_by_tc or random.random() < 0.4
+    ]
+    for tc_id in uat_tc_ids:
+        tc = test_cases[tc_id]
+        defect = defect_by_tc.get(tc_id)
+        if defect is not None:
+            result = "Pass" if defect["status"] in CLOSED_DEFECT_STATUSES else "Fail"
+        else:
+            result = random.choice(EXECUTION_RESULTS_WEIGHTED)
+        results.append(TestRunResult(run_id=uat_run.id, testcase_id=tc.id, result=result))
+
+    db.add_all(results)
     db.flush()
     return results
 
@@ -217,12 +228,16 @@ def main():
             print("Seed data already present, skipping.")
             return
 
+        req_data = load_json("requirements.json")
+        tc_data = load_json("test_cases.json")
+        defect_data = load_json("defects.json")
+
         project = seed_project(db)
         releases = seed_releases(db, project)
-        requirements = seed_requirements(db, project)
-        test_cases = seed_test_cases(db, requirements)
-        defects = seed_defects(db, test_cases, requirements)
-        results = seed_test_runs(db, releases, test_cases)
+        requirements = seed_requirements(db, project, req_data)
+        test_cases = seed_test_cases(db, requirements, tc_data)
+        defects = seed_defects(db, test_cases, requirements, defect_data, releases)
+        results = seed_test_runs(db, releases, test_cases, defect_data)
 
         db.commit()
 

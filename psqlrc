@@ -1,0 +1,5 @@
+\x auto
+\pset border 2
+\pset linestyle unicode
+\pset null '∅'
+\timing on

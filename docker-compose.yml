@@ -11,6 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - qcsuite_db_data:/var/lib/postgresql/data
+      - ./psqlrc:/root/.psqlrc
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U qcsuite -d qcsuite_db"]
       interval: 10s
