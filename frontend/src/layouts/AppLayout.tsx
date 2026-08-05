@@ -1,12 +1,35 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NAV_SECTIONS } from '@/nav'
-import { clearToken } from '@/lib/auth'
+import { clearToken, getCurrentUser, type CurrentUser } from '@/lib/auth'
+
+function getInitials(user: CurrentUser | null): string {
+  if (!user) return ''
+  const name = user.full_name?.trim()
+  if (name) {
+    const parts = name.split(/\s+/)
+    const first = parts[0]?.[0] ?? ''
+    const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : ''
+    return (first + last).toUpperCase()
+  }
+  return user.email[0]?.toUpperCase() ?? ''
+}
 
 export function AppLayout() {
   const navigate = useNavigate()
+  const [user, setUser] = useState<CurrentUser | null>(null)
+
+  useEffect(() => {
+    getCurrentUser()
+      .then(setUser)
+      .catch(() => {
+        // A 401 is already handled globally by api.ts (clears token, redirects to
+        // /login). Anything else (network blip) just leaves the sidebar placeholder.
+      })
+  }, [])
 
   function handleLogout() {
     clearToken()
@@ -56,11 +79,11 @@ export function AppLayout() {
 
         <div className="flex items-center gap-2.5 border-t border-sidebar-border px-4 py-3.5">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-medium">
-            HN
+            {getInitials(user)}
           </div>
           <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-sm font-medium">Huyền Nguyễn</div>
-            <div className="truncate text-xs text-sidebar-foreground/50">QA Lead · Admin</div>
+            <div className="truncate text-sm font-medium">{user?.full_name ?? user?.email ?? ''}</div>
+            <div className="truncate text-xs text-sidebar-foreground/50">{user?.email ?? ''}</div>
           </div>
           <Button
             type="button"
