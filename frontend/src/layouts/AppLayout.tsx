@@ -25,9 +25,10 @@ export function AppLayout() {
   useEffect(() => {
     getCurrentUser()
       .then(setUser)
-      .catch(() => {
+      .catch((err) => {
         // A 401 is already handled globally by api.ts (clears token, redirects to
         // /login). Anything else (network blip) just leaves the sidebar placeholder.
+        console.error('Failed to load current user', err)
       })
   }, [])
 

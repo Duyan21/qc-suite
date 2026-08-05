@@ -44,20 +44,21 @@ async function extractErrorMessage(response: Response): Promise<string> {
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const hadToken = getToken() !== null
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  }
+  const sentAuth = 'Authorization' in headers
 
   const response = await fetch(`${BASE_URL}${path}`, {
     method: options.method ?? 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   })
 
   if (!response.ok) {
     const message = await extractErrorMessage(response)
-    if (response.status === 401 && hadToken) {
+    if (response.status === 401 && sentAuth) {
       clearToken()
       window.location.href = '/login'
     }
