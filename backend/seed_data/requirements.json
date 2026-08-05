@@ -1,0 +1,302 @@
+[
+  {
+    "req_id": "REQ-001",
+    "module": "Customer & Loan Application",
+    "title": "Create Home Loan Application",
+    "description": "Customer creates a new home loan application by providing personal details, employment information, and the desired loan amount and property."
+  },
+  {
+    "req_id": "REQ-002",
+    "module": "Customer & Loan Application",
+    "title": "Save Draft",
+    "description": "Customer saves an in-progress application as a draft to complete later without losing entered data."
+  },
+  {
+    "req_id": "REQ-003",
+    "module": "Customer & Loan Application",
+    "title": "Resume Draft",
+    "description": "Customer resumes a previously saved draft application and continues from where they left off."
+  },
+  {
+    "req_id": "REQ-004",
+    "module": "Customer & Loan Application",
+    "title": "Update Application",
+    "description": "Customer updates details of an application that has not yet been submitted for review."
+  },
+  {
+    "req_id": "REQ-005",
+    "module": "Customer & Loan Application",
+    "title": "Upload Supporting Documents",
+    "description": "Customer uploads supporting documents (ID, payslips, bank statements, property papers) required for the application."
+  },
+  {
+    "req_id": "REQ-006",
+    "module": "Customer & Loan Application",
+    "title": "Delete Draft",
+    "description": "Customer deletes a draft application that is no longer needed."
+  },
+  {
+    "req_id": "REQ-007",
+    "module": "Customer & Loan Application",
+    "title": "Submit Application",
+    "description": "Customer submits a completed application for processing; KYC must be completed before submission is allowed."
+  },
+  {
+    "req_id": "REQ-008",
+    "module": "Customer & Loan Application",
+    "title": "Track Application Status",
+    "description": "Customer views the current status of a submitted application as it moves through the approval pipeline."
+  },
+  {
+    "req_id": "REQ-009",
+    "module": "Customer Eligibility & Verification",
+    "title": "Customer Identity Verification",
+    "description": "System verifies the customer's identity against submitted ID documents before proceeding with eligibility checks."
+  },
+  {
+    "req_id": "REQ-010",
+    "module": "Customer Eligibility & Verification",
+    "title": "Age Validation",
+    "description": "System validates that the applicant meets the minimum applicant age of 18 years."
+  },
+  {
+    "req_id": "REQ-011",
+    "module": "Customer Eligibility & Verification",
+    "title": "Citizenship Validation",
+    "description": "System validates the applicant's citizenship/residency status against program eligibility rules."
+  },
+  {
+    "req_id": "REQ-012",
+    "module": "Customer Eligibility & Verification",
+    "title": "Employment Verification",
+    "description": "System verifies the applicant's employment status and employer details."
+  },
+  {
+    "req_id": "REQ-013",
+    "module": "Customer Eligibility & Verification",
+    "title": "Income Verification",
+    "description": "System verifies the applicant's income using payslips or bank statements issued within the last 6 months."
+  },
+  {
+    "req_id": "REQ-014",
+    "module": "Customer Eligibility & Verification",
+    "title": "Existing Debt Assessment",
+    "description": "System reviews the applicant's existing debt obligations as an input to the credit assessment."
+  },
+  {
+    "req_id": "REQ-015",
+    "module": "Customer Eligibility & Verification",
+    "title": "AML Screening",
+    "description": "System screens the applicant against anti-money-laundering (AML) sanctioned-party lists before KYC approval."
+  },
+  {
+    "req_id": "REQ-016",
+    "module": "Customer Eligibility & Verification",
+    "title": "KYC Approval",
+    "description": "System finalizes KYC approval once identity, age, citizenship, and AML checks have all passed."
+  },
+  {
+    "req_id": "REQ-017",
+    "module": "Property Assessment",
+    "title": "Add Property",
+    "description": "Customer adds the property being purchased or used as collateral to the application."
+  },
+  {
+    "req_id": "REQ-018",
+    "module": "Property Assessment",
+    "title": "Property Ownership Verification",
+    "description": "System verifies legal ownership of the property against the submitted title/ownership documents."
+  },
+  {
+    "req_id": "REQ-019",
+    "module": "Property Assessment",
+    "title": "Property Address Validation",
+    "description": "System validates the property address for completeness and correctness."
+  },
+  {
+    "req_id": "REQ-020",
+    "module": "Property Assessment",
+    "title": "Property Type Validation",
+    "description": "System validates that the property type is eligible as collateral under lending policy (e.g., agricultural land is excluded)."
+  },
+  {
+    "req_id": "REQ-021",
+    "module": "Property Assessment",
+    "title": "Property Valuation",
+    "description": "System records the appraised property valuation, valid for 90 days from the assessment date."
+  },
+  {
+    "req_id": "REQ-022",
+    "module": "Property Assessment",
+    "title": "Loan-to-Value Calculation",
+    "description": "System calculates the loan-to-value (LTV) ratio and enforces the maximum LTV of 80%."
+  },
+  {
+    "req_id": "REQ-023",
+    "module": "Property Assessment",
+    "title": "Insurance Validation",
+    "description": "System validates that required property insurance is in place before property approval."
+  },
+  {
+    "req_id": "REQ-024",
+    "module": "Property Assessment",
+    "title": "Property Approval",
+    "description": "System finalizes property approval once ownership, valuation, and insurance checks pass."
+  },
+  {
+    "req_id": "REQ-025",
+    "module": "Credit Assessment & Approval",
+    "title": "Credit Score Assessment",
+    "description": "System assesses the applicant's credit score to support the lending decision."
+  },
+  {
+    "req_id": "REQ-026",
+    "module": "Credit Assessment & Approval",
+    "title": "Debt-to-Income Calculation",
+    "description": "System calculates the debt-to-income (DTI) ratio and enforces the maximum DTI of 40%."
+  },
+  {
+    "req_id": "REQ-027",
+    "module": "Credit Assessment & Approval",
+    "title": "Maximum Loan Calculation",
+    "description": "System calculates the maximum loan amount the applicant qualifies for based on income, DTI, and LTV limits."
+  },
+  {
+    "req_id": "REQ-028",
+    "module": "Credit Assessment & Approval",
+    "title": "Interest Rate Calculation",
+    "description": "System calculates the applicable interest rate, including any eligible promotional rates."
+  },
+  {
+    "req_id": "REQ-029",
+    "module": "Credit Assessment & Approval",
+    "title": "Repayment Schedule Calculation",
+    "description": "System generates the repayment schedule based on loan amount, interest rate, and tenure (maximum 35 years)."
+  },
+  {
+    "req_id": "REQ-030",
+    "module": "Credit Assessment & Approval",
+    "title": "Manual Review",
+    "description": "System routes borderline applications to a loan officer for manual review."
+  },
+  {
+    "req_id": "REQ-031",
+    "module": "Credit Assessment & Approval",
+    "title": "Conditional Approval",
+    "description": "System supports conditional approval of an application pending outstanding conditions."
+  },
+  {
+    "req_id": "REQ-032",
+    "module": "Credit Assessment & Approval",
+    "title": "Loan Approval",
+    "description": "Branch manager approves the loan application once all assessment criteria are satisfied."
+  },
+  {
+    "req_id": "REQ-033",
+    "module": "Credit Assessment & Approval",
+    "title": "Loan Rejection",
+    "description": "System records the rejection of an application that fails eligibility, credit, or policy checks."
+  },
+  {
+    "req_id": "REQ-034",
+    "module": "Contract & Disbursement",
+    "title": "Generate Loan Contract",
+    "description": "System generates the loan contract document based on approved loan terms."
+  },
+  {
+    "req_id": "REQ-035",
+    "module": "Contract & Disbursement",
+    "title": "Digital Signature",
+    "description": "Customer digitally signs the loan contract using a valid, non-expired certificate."
+  },
+  {
+    "req_id": "REQ-036",
+    "module": "Contract & Disbursement",
+    "title": "Accept Terms",
+    "description": "Customer accepts the loan terms and conditions prior to disbursement."
+  },
+  {
+    "req_id": "REQ-037",
+    "module": "Contract & Disbursement",
+    "title": "Schedule Disbursement",
+    "description": "System schedules the disbursement of loan funds after contract signing."
+  },
+  {
+    "req_id": "REQ-038",
+    "module": "Contract & Disbursement",
+    "title": "Execute Disbursement",
+    "description": "System executes a single, idempotent transfer of loan funds to the customer."
+  },
+  {
+    "req_id": "REQ-039",
+    "module": "Contract & Disbursement",
+    "title": "Customer Notification",
+    "description": "System notifies the customer of key contract and disbursement milestones."
+  },
+  {
+    "req_id": "REQ-040",
+    "module": "Contract & Disbursement",
+    "title": "Loan Activation",
+    "description": "System activates the loan only after disbursement has been confirmed."
+  },
+  {
+    "req_id": "REQ-041",
+    "module": "Contract & Disbursement",
+    "title": "Disbursement Confirmation",
+    "description": "System confirms successful disbursement and records the confirmation."
+  },
+  {
+    "req_id": "REQ-042",
+    "module": "Loan Servicing",
+    "title": "View Repayment Schedule",
+    "description": "Customer views the current repayment schedule for an active loan."
+  },
+  {
+    "req_id": "REQ-043",
+    "module": "Loan Servicing",
+    "title": "Repayment Processing",
+    "description": "System processes a scheduled repayment against an active loan."
+  },
+  {
+    "req_id": "REQ-044",
+    "module": "Loan Servicing",
+    "title": "Partial Repayment",
+    "description": "System accepts a partial repayment and recalculates the outstanding balance."
+  },
+  {
+    "req_id": "REQ-045",
+    "module": "Loan Servicing",
+    "title": "Early Settlement",
+    "description": "System calculates the payoff amount, including any early settlement penalty, using the currently effective rate."
+  },
+  {
+    "req_id": "REQ-046",
+    "module": "Loan Servicing",
+    "title": "Penalty Calculation",
+    "description": "System calculates penalties for late or early repayment events."
+  },
+  {
+    "req_id": "REQ-047",
+    "module": "Loan Servicing",
+    "title": "Loan Statement",
+    "description": "System generates a loan statement showing repayment history and outstanding balance."
+  },
+  {
+    "req_id": "REQ-048",
+    "module": "Loan Servicing",
+    "title": "Update Customer Profile",
+    "description": "Customer updates personal/contact details on their profile."
+  },
+  {
+    "req_id": "REQ-049",
+    "module": "Loan Servicing",
+    "title": "Close Loan",
+    "description": "System closes a loan once fully repaid; a closed loan must no longer accept repayments."
+  },
+  {
+    "req_id": "REQ-050",
+    "module": "Loan Servicing",
+    "title": "Notification History",
+    "description": "Customer views the history of notifications (SMS/email) sent regarding their loan, without duplicates."
+  }
+]
