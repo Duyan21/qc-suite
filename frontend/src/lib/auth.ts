@@ -1,46 +1,66 @@
-const TOKEN_KEY = 'qms_token'
+import { apiFetch, authFetch, setToken } from './api'
 
-// Mocked until the FastAPI /auth endpoints land — swap these for real fetch
-// calls once the backend stabilizes (see CLAUDE.md working conventions).
-const DEMO_USER = {
-  name: 'Huyền Nguyễn',
-  email: 'admin@homelending.com',
-  password: 'password123',
+export { getToken, clearToken } from './api'
+
+const ERROR_MESSAGES: Record<string, string> = {
+  'Invalid email or password': 'Email hoặc mật khẩu không đúng',
+  'Email already registered': 'Email đã được sử dụng',
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+function toVietnameseError(err: unknown): Error {
+  const message = err instanceof Error ? err.message : ''
+  return new Error(ERROR_MESSAGES[message] ?? 'Đã có lỗi xảy ra, vui lòng thử lại.')
+}
+
+type LoginResponse = {
+  access_token: string
+  token_type: string
 }
 
 export async function login(email: string, password: string): Promise<void> {
-  await delay(500)
-  if (email !== DEMO_USER.email || password !== DEMO_USER.password) {
-    throw new Error('Email hoặc mật khẩu không đúng')
+  try {
+    const response = await apiFetch<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+    })
+    setToken(response.access_token)
+  } catch (err) {
+    throw toVietnameseError(err)
   }
-  localStorage.setItem(TOKEN_KEY, `mock-jwt.${btoa(email)}.${Date.now()}`)
 }
 
 export async function register(name: string, email: string, password: string): Promise<void> {
-  await delay(500)
-  if (!name || !email || !password) {
-    throw new Error('Vui lòng điền đầy đủ thông tin')
-  }
-  if (email === DEMO_USER.email) {
-    throw new Error('Email đã được sử dụng')
+  try {
+    await apiFetch('/auth/register', {
+      method: 'POST',
+      body: { email, password, full_name: name },
+    })
+  } catch (err) {
+    throw toVietnameseError(err)
   }
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  await delay(500)
-  if (!email) {
-    throw new Error('Vui lòng nhập email')
+  try {
+    await apiFetch('/auth/forgot-password', {
+      method: 'POST',
+      body: { email },
+    })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'User not found') {
+      return
+    }
+    throw toVietnameseError(err)
   }
 }
 
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+export type CurrentUser = {
+  id: number
+  email: string
+  full_name: string | null
+  is_active: boolean
 }
 
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
+export async function getCurrentUser(): Promise<CurrentUser> {
+  return authFetch<CurrentUser>('/auth/me')
 }

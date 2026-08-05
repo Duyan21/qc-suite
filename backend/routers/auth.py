@@ -14,6 +14,7 @@ from schemas.auth import (
 from services.auth_service import (
     create_access_token,
     create_reset_token,
+    get_current_user,
     hash_password,
     verify_password,
 )
@@ -65,3 +66,8 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     reset_token = create_reset_token(user.id)
     print(f"[password-reset] email={user.email} token={reset_token}")
     return ForgotPasswordResponse(reset_token=reset_token, expires_in_minutes=30)
+
+
+@router.get("/me", response_model=UserResponse)
+def me(current_user: User = Depends(get_current_user)):
+    return current_user
