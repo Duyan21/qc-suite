@@ -1,8 +1,84 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Check, X, Diamond } from 'lucide-react'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { useCurrentProject } from '@/lib/currentProject'
-import { getTraceability, type TraceabilityResponse } from '@/lib/traceability'
+import {
+  getTraceability,
+  type TraceabilityResponse,
+  type TraceabilityRequirementItem,
+  type TraceabilityStatus,
+} from '@/lib/traceability'
+
+type Column = { id: number; code: string }
+
+function deriveColumns(items: TraceabilityRequirementItem[]): Column[] {
+  return items.flatMap((req) => req.test_cases.map((tc) => ({ id: tc.id, code: tc.code })))
+}
+
+function StatusIcon({ status }: { status: TraceabilityStatus }) {
+  if (status === 'covered') return <Check className="size-4 text-green-600" aria-label="Pass" />
+  if (status === 'failed') return <X className="size-4 text-destructive" aria-label="Fail" />
+  return <Diamond className="size-4 text-blue-500" aria-label="Linked — not run" />
+}
+
+function TraceabilityMatrix({ items }: { items: TraceabilityRequirementItem[] }) {
+  const columns = deriveColumns(items)
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="sticky left-0 z-10 bg-card">Requirement</TableHead>
+          {columns.map((col) => (
+            <TableHead key={col.id}>{col.code}</TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.map((req) => {
+          const statusByTcId = new Map(req.test_cases.map((tc) => [tc.id, tc.status]))
+          return (
+            <TableRow key={req.id}>
+              <TableCell className="sticky left-0 z-10 bg-card">
+                <Link to={`/requirements/${req.id}`} className="text-primary underline-offset-4 hover:underline">
+                  {req.req_id}
+                </Link>
+                <div className="text-xs text-muted-foreground">{req.title}</div>
+              </TableCell>
+              {columns.map((col) => {
+                const status = statusByTcId.get(col.id)
+                return (
+                  <TableCell key={col.id}>
+                    {status && <StatusIcon status={status} />}
+                  </TableCell>
+                )
+              })}
+            </TableRow>
+          )
+        })}
+      </TableBody>
+    </Table>
+  )
+}
+
+function TraceabilityLegend() {
+  return (
+    <div className="flex items-center gap-4 px-4 text-sm text-muted-foreground">
+      <span className="flex items-center gap-1.5">
+        <Check className="size-4 text-green-600" /> Pass
+      </span>
+      <span className="flex items-center gap-1.5">
+        <X className="size-4 text-destructive" /> Fail
+      </span>
+      <span className="flex items-center gap-1.5">
+        <Diamond className="size-4 text-blue-500" /> Linked — not run
+      </span>
+    </div>
+  )
+}
 
 export function TraceabilityPage() {
   const { project } = useCurrentProject()
@@ -62,9 +138,10 @@ export function TraceabilityPage() {
         <p className="px-4 text-sm text-muted-foreground">Chưa có yêu cầu nào.</p>
       )}
       {project && !loading && !error && data && data.items.length > 0 && (
-        <p className="px-4 text-sm text-muted-foreground">
-          {data.items.length} requirement(s) loaded — matrix rendering lands in Task 6.
-        </p>
+        <>
+          <TraceabilityLegend />
+          <TraceabilityMatrix items={data.items} />
+        </>
       )}
     </Card>
   )
