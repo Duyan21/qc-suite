@@ -5,6 +5,41 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NAV_SECTIONS } from '@/nav'
 import { clearToken, getCurrentUser, type CurrentUser } from '@/lib/auth'
+import { CurrentProjectProvider, useCurrentProject } from '@/lib/currentProject'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+function ProjectSwitcher() {
+  const { projects, project, setProject, loading } = useCurrentProject()
+
+  if (!loading && projects.length === 0) {
+    return (
+      <div className="px-4 pb-3 text-xs text-sidebar-foreground/50">Chưa có dự án</div>
+    )
+  }
+
+  return (
+    <div className="px-4 pb-3">
+      <Select
+        value={project ? String(project.id) : undefined}
+        onValueChange={(value) => {
+          const next = projects.find((p) => String(p.id) === value)
+          if (next) setProject(next)
+        }}
+      >
+        <SelectTrigger className="w-full" size="sm">
+          <SelectValue placeholder="Chọn dự án" />
+        </SelectTrigger>
+        <SelectContent>
+          {projects.map((p) => (
+            <SelectItem key={p.id} value={String(p.id)}>
+              {p.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
 
 function getInitials(user: CurrentUser | null): string {
   if (!user) return ''
@@ -60,6 +95,8 @@ export function AppLayout() {
         </Button>
       </div>
 
+      <ProjectSwitcher />
+
       <nav className="flex-1 space-y-5 overflow-y-auto px-2.5 py-4">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
@@ -113,44 +150,46 @@ export function AppLayout() {
   )
 
   return (
-    <div className="flex min-h-svh flex-col md:flex-row">
-      <header className="dark flex items-center gap-2.5 border-b border-sidebar-border bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Mở menu"
-          onClick={() => setMobileNavOpen(true)}
-          className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        >
-          <Menu className="size-4" />
-        </Button>
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
-          Q
-        </div>
-        <div className="text-sm font-semibold">QMS</div>
-      </header>
+    <CurrentProjectProvider>
+      <div className="flex min-h-svh flex-col md:flex-row">
+        <header className="dark flex items-center gap-2.5 border-b border-sidebar-border bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Mở menu"
+            onClick={() => setMobileNavOpen(true)}
+            className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <Menu className="size-4" />
+          </Button>
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
+            Q
+          </div>
+          <div className="text-sm font-semibold">QMS</div>
+        </header>
 
-      {mobileNavOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
-          onClick={() => setMobileNavOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      <aside
-        className={cn(
-          'dark fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 md:static md:z-auto md:w-56 md:translate-x-0',
-          mobileNavOpen && 'translate-x-0',
+        {mobileNavOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            onClick={() => setMobileNavOpen(false)}
+            aria-hidden="true"
+          />
         )}
-      >
-        {sidebarContent}
-      </aside>
 
-      <main className="min-w-0 flex-1 overflow-x-hidden p-4 md:p-6">
-        <Outlet />
-      </main>
-    </div>
+        <aside
+          className={cn(
+            'dark fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 md:static md:z-auto md:w-56 md:translate-x-0',
+            mobileNavOpen && 'translate-x-0',
+          )}
+        >
+          {sidebarContent}
+        </aside>
+
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 md:p-6">
+          <Outlet />
+        </main>
+      </div>
+    </CurrentProjectProvider>
   )
 }
