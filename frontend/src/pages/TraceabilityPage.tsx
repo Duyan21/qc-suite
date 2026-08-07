@@ -18,6 +18,14 @@ function deriveColumns(items: TraceabilityRequirementItem[]): Column[] {
   return items.flatMap((req) => req.test_cases.map((tc) => ({ id: tc.id, code: tc.code })))
 }
 
+function computeStats(items: TraceabilityRequirementItem[]) {
+  const allTestCases = items.flatMap((r) => r.test_cases)
+  const totalLinked = allTestCases.length
+  const executed = allTestCases.filter((tc) => tc.status === 'covered' || tc.status === 'failed').length
+  const covered = allTestCases.filter((tc) => tc.status === 'covered').length
+  return { totalLinked, executed, covered }
+}
+
 function StatusIcon({ status }: { status: TraceabilityStatus }) {
   if (status === 'covered') return <Check className="size-4 text-green-600" aria-label="Pass" />
   if (status === 'failed') return <X className="size-4 text-destructive" aria-label="Fail" />
@@ -137,6 +145,16 @@ export function TraceabilityPage() {
       {project && !loading && !error && data && data.items.length === 0 && (
         <p className="px-4 text-sm text-muted-foreground">Chưa có yêu cầu nào.</p>
       )}
+      {project && !loading && !error && data && data.items.length > 0 && (() => {
+        const { totalLinked, executed, covered } = computeStats(data.items)
+        return (
+          <p className="px-4 text-sm text-muted-foreground">
+            {totalLinked === 0
+              ? 'Chưa có test case nào được liên kết.'
+              : `Coverage: ${Math.round((covered / totalLinked) * 100)}% · ${executed} / ${totalLinked} TC executed`}
+          </p>
+        )
+      })()}
       {project && !loading && !error && data && data.items.length > 0 && (
         <>
           <TraceabilityLegend />
