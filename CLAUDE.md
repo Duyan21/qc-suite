@@ -111,11 +111,20 @@ qc-suite/
 
 
 ### Frontend Routes
-`/login`, `/register`, `/forgot-password` (standalone, no sidebar) + 8 routes under
-`AppLayout`: `/requirements`, `/testcases`, `/defects`, `/traceability`, `/search`,
-`/agent`, `/report`, `/admin`. Bare `/` redirects to `/requirements`. Auth is wired to the
-real backend (Sprint 0/1) — everything else is still placeholder pages, real content/data
-fetching for those lands in later sprints.
+`/login`, `/register`, `/forgot-password` (standalone, no sidebar) + 10 routes under
+`AppLayout`: `/dashboard`, `/requirements`, `/testcases`, `/defects`, `/traceability`,
+`/search`, `/agent`, `/report`, `/testruns`, `/admin` (see `frontend/src/nav.tsx` for the
+authoritative list/order). Bare `/` redirects to `/dashboard`. `/requirements/:id` is a
+second, non-nav route wired directly in `App.tsx` (not `nav.tsx`) — a detail-page target
+linked from elsewhere (currently the Traceability matrix's `req_id` cells), not a sidebar
+item.
+
+Wired-to-real-backend: Auth (Sprint 0/1) and Traceability (Sprint 1 — `GET /traceability`,
+plus the new project switcher, see below). Built with real UI but still mock data, not yet
+backend-integrated: Admin. Bare placeholder pages (Card + title only): Dashboard,
+Requirements, Test Cases, Defects, Semantic Search, Impact Agent, Test Runs, Release
+Report, and the `/requirements/:id` detail stub (deliberately bare — real content lands
+whenever `RequirementsPage` itself gets built for real, not before).
 
 ### API Integration Pattern (established by the auth wiring)
 `frontend/src/lib/api.ts` is the shared fetch wrapper every backend integration should go
@@ -135,7 +144,35 @@ through — don't hand-roll `fetch()` calls in page components:
   the real module against the real running backend — Vite's own SSR loader
   (`createServer({server:{middlewareMode:true}}).ssrLoadModule(path)`) runs the actual
   TypeScript source through Vite's transform pipeline (so `import.meta.env` etc. resolve
-  correctly) with a `localStorage` shim, no browser required
+  correctly) with a `localStorage` shim, no browser required. Separately: no
+  browser-automation tool (Playwright/Puppeteer/etc.) has been available in any Claude
+  Code session working on this repo so far either — assume none until proven otherwise.
+  Interactive/visual behavior (dropdown clicks, scroll/sticky-positioning, a downloaded
+  file's actual contents) cannot be verified by an agent; confirm what's mechanically
+  possible (`tsc --noEmit`, live `curl` against the running backend, careful code-path
+  reading) and say plainly in any report which claims are code-reviewed vs. actually
+  observed running — then hand the interactive pass to whoever's driving the session.
+
+### Project-scoping pattern (established by the Traceability wiring)
+Every backend list endpoint (`/traceability`, `/requirements`, `/releases`, ...) is scoped
+by `project_id` — there is no per-page project state, it's global:
+- `frontend/src/lib/projects.ts` — `listProjects()`, thin wrapper over `GET /projects`
+- `frontend/src/lib/currentProject.tsx` — `CurrentProjectProvider` + `useCurrentProject()`
+  React context: fetches the project list once, restores the last-selected project id from
+  `localStorage['qms_project_id']` if still valid else defaults to the first project,
+  exposes `{ projects, project, setProject, loading }`
+- Mounted once in `AppLayout.tsx` (wrapping the whole `<Outlet/>` subtree, alongside a
+  `ProjectSwitcher` dropdown in the sidebar) — any page under `AppLayout` can call
+  `useCurrentProject()` directly rather than managing its own project state or fetch
+- A page consuming `project?.id` in a data-fetching `useEffect` must guard against
+  in-flight-response races on rapid project switching (see `TraceabilityPage.tsx`'s
+  `requestIdRef`-based guard) — a naive `useEffect(() => { load(project.id) }, [project])`
+  can let a slow response for the *previous* project overwrite the current one's state
+- Context/derived-data memoization matters here: `CurrentProjectProvider`'s value object
+  and any expensive per-page derived data (e.g. `TraceabilityPage`'s `deriveColumns`/
+  `computeStats`) should be wrapped in `useMemo`/`useCallback` — `AppLayout` re-renders for
+  unrelated reasons (mobile nav toggle, `getCurrentUser()` resolving), and an unmemoized
+  context value forces every consumer, including a large rendered matrix, to rebuild
 
 Import alias `@/*` → `src/*` (wired in `tsconfig.json`, `tsconfig.app.json`, and
 `vite.config.ts`). Use it instead of relative `../` imports. Note: `tsconfig.app.json`
