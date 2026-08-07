@@ -88,6 +88,24 @@ function TraceabilityLegend() {
   )
 }
 
+function exportCsv(items: TraceabilityRequirementItem[]) {
+  const columns = deriveColumns(items)
+  const header = ['Requirement', ...columns.map((c) => c.code)]
+  const rows = items.map((req) => {
+    const statusByTcId = new Map(req.test_cases.map((tc) => [tc.id, tc.status]))
+    return [req.req_id, ...columns.map((col) => statusByTcId.get(col.id) ?? '')]
+  })
+  const csv = [header, ...rows].map((row) => row.join(',')).join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'traceability.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function TraceabilityPage() {
   const { project } = useCurrentProject()
   const [data, setData] = useState<TraceabilityResponse | null>(null)
@@ -125,8 +143,13 @@ export function TraceabilityPage() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Traceability Matrix</CardTitle>
+        {data && data.items.length > 0 && (
+          <Button size="sm" onClick={() => exportCsv(data.items)}>
+            Xuất CSV
+          </Button>
+        )}
       </CardHeader>
       {!project && (
         <p className="px-4 text-sm text-muted-foreground">Vui lòng chọn một dự án.</p>
