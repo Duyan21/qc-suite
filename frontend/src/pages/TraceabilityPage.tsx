@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useCurrentProject } from '@/lib/currentProject'
@@ -9,6 +9,7 @@ export function TraceabilityPage() {
   const [data, setData] = useState<TraceabilityResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     if (!project) {
@@ -20,12 +21,22 @@ export function TraceabilityPage() {
   }, [project?.id])
 
   function load(projectId: number) {
+    const requestId = ++requestIdRef.current
     setLoading(true)
     setError(null)
     getTraceability(projectId)
-      .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra'))
-      .finally(() => setLoading(false))
+      .then((result) => {
+        if (requestIdRef.current !== requestId) return
+        setData(result)
+      })
+      .catch((err) => {
+        if (requestIdRef.current !== requestId) return
+        setError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra')
+      })
+      .finally(() => {
+        if (requestIdRef.current !== requestId) return
+        setLoading(false)
+      })
   }
 
   return (
