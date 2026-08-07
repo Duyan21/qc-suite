@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, X, Diamond } from 'lucide-react'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,7 +33,7 @@ function StatusIcon({ status }: { status: TraceabilityStatus }) {
 }
 
 function TraceabilityMatrix({ items }: { items: TraceabilityRequirementItem[] }) {
-  const columns = deriveColumns(items)
+  const columns = useMemo(() => deriveColumns(items), [items])
 
   return (
     <Table>
@@ -102,8 +102,10 @@ function exportCsv(items: TraceabilityRequirementItem[]) {
   const a = document.createElement('a')
   a.href = url
   a.download = 'traceability.csv'
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 export function TraceabilityPage() {
@@ -112,6 +114,7 @@ export function TraceabilityPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const requestIdRef = useRef(0)
+  const stats = useMemo(() => (data ? computeStats(data.items) : null), [data?.items])
 
   useEffect(() => {
     if (!project) {
@@ -145,7 +148,7 @@ export function TraceabilityPage() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Traceability Matrix</CardTitle>
-        {data && data.items.length > 0 && (
+        {project && !loading && !error && data && data.items.length > 0 && (
           <Button size="sm" onClick={() => exportCsv(data.items)}>
             Xuất CSV
           </Button>
@@ -168,16 +171,13 @@ export function TraceabilityPage() {
       {project && !loading && !error && data && data.items.length === 0 && (
         <p className="px-4 text-sm text-muted-foreground">Chưa có yêu cầu nào.</p>
       )}
-      {project && !loading && !error && data && data.items.length > 0 && (() => {
-        const { totalLinked, executed, covered } = computeStats(data.items)
-        return (
-          <p className="px-4 text-sm text-muted-foreground">
-            {totalLinked === 0
-              ? 'Chưa có test case nào được liên kết.'
-              : `Độ bao phủ: ${Math.round((covered / totalLinked) * 100)}% · ${executed} / ${totalLinked} TC đã thực thi`}
-          </p>
-        )
-      })()}
+      {project && !loading && !error && data && data.items.length > 0 && stats && (
+        <p className="px-4 text-sm text-muted-foreground">
+          {stats.totalLinked === 0
+            ? 'Chưa có test case nào được liên kết.'
+            : `Độ bao phủ: ${Math.round((stats.covered / stats.totalLinked) * 100)}% · ${stats.executed} / ${stats.totalLinked} TC đã thực thi`}
+        </p>
+      )}
       {project && !loading && !error && data && data.items.length > 0 && (
         <>
           <TraceabilityLegend />

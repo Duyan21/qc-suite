@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { listProjects, type Project } from './projects'
 
 const STORAGE_KEY = 'qms_project_id'
@@ -31,13 +31,18 @@ export function CurrentProjectProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false))
   }, [])
 
-  function setProject(p: Project) {
+  const setProject = useCallback((p: Project) => {
     setProjectState(p)
     localStorage.setItem(STORAGE_KEY, String(p.id))
-  }
+  }, [])
+
+  const value = useMemo(
+    () => ({ projects, project, setProject, loading }),
+    [projects, project, setProject, loading],
+  )
 
   return (
-    <CurrentProjectContext.Provider value={{ projects, project, setProject, loading }}>
+    <CurrentProjectContext.Provider value={value}>
       {children}
     </CurrentProjectContext.Provider>
   )
