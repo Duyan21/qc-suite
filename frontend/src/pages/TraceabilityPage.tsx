@@ -151,7 +151,7 @@ export function TraceabilityPage() {
           <p className="px-4 text-sm text-muted-foreground">
             {totalLinked === 0
               ? 'Chưa có test case nào được liên kết.'
-              : `Coverage: ${Math.round((covered / totalLinked) * 100)}% · ${executed} / ${totalLinked} TC executed`}
+              : `Độ bao phủ: ${Math.round((covered / totalLinked) * 100)}% · ${executed} / ${totalLinked} TC đã thực thi`}
           </p>
         )
       })()}
