@@ -3,15 +3,23 @@ import type { RequirementSummary } from './requirements'
 
 export { REQUIREMENT_STATUS_BADGE_CLASS as TC_STATUS_BADGE_CLASS } from './requirements'
 
-export type TestCase = {
+export type TestCaseStatus = 'Draft' | 'Active' | 'Deprecated'
+export type TestCasePriority = 'High' | 'Medium' | 'Low'
+
+export type TestCaseListItem = {
   id: number
   code: string
   title: string
+  priority: string | null
   status: string
+  requirement_id: number | null
+  requirement: RequirementSummary | null
+  created_at: string
+  updated_at: string
 }
 
 export type TestCaseListResponse = {
-  items: TestCase[]
+  items: TestCaseListItem[]
   total: number
   page: number
   limit: number
@@ -39,6 +47,16 @@ export type TestCaseExecutionHistoryItem = {
   note: string | null
 }
 
+export type TestCaseListParams = {
+  project_id?: number
+  requirement_id?: number
+  page?: number
+  limit?: number
+  status?: TestCaseStatus
+  priority?: TestCasePriority
+  search?: string
+}
+
 export const TC_PRIORITY_BADGE_CLASS: Record<string, string> = {
   High: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
   Medium: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
@@ -60,12 +78,14 @@ export async function getTestCaseResults(id: number): Promise<TestCaseExecutionH
   return authFetch<TestCaseExecutionHistoryItem[]>(`/test-cases/${id}/results`)
 }
 
-export async function listTestCases(
-  params: { requirement_id?: number; page?: number; limit?: number } = {},
-): Promise<TestCaseListResponse> {
+export async function listTestCases(params: TestCaseListParams = {}): Promise<TestCaseListResponse> {
   const query = new URLSearchParams()
+  if (params.project_id !== undefined) query.set('project_id', String(params.project_id))
   if (params.requirement_id !== undefined) query.set('requirement_id', String(params.requirement_id))
   if (params.page) query.set('page', String(params.page))
   if (params.limit) query.set('limit', String(params.limit))
+  if (params.status) query.set('status', params.status)
+  if (params.priority) query.set('priority', params.priority)
+  if (params.search) query.set('search', params.search)
   return authFetch<TestCaseListResponse>(`/test-cases?${query.toString()}`)
 }
