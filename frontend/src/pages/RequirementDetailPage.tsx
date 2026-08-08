@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { useCurrentProject } from '@/lib/currentProject'
 import { formatDate } from '@/lib/utils'
 import {
   getRequirement,
@@ -24,7 +23,6 @@ import { listDefects } from '@/lib/defects'
 
 export function RequirementDetailPage() {
   const { id } = useParams()
-  const { project } = useCurrentProject()
   const [requirement, setRequirement] = useState<Requirement | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -83,23 +81,23 @@ export function RequirementDetailPage() {
   }, [requirement])
 
   useEffect(() => {
-    if (!requirement || !project) {
+    if (!requirement) {
       setLinkedTestCases(null)
       return
     }
     const requestId = ++linkedTcRequestIdRef.current
     setLinkedTestCases(null)
-    getTraceability(project.id)
+    getTraceability(requirement.project_id)
       .then((result) => {
         if (linkedTcRequestIdRef.current !== requestId) return
-        const match = result.items.find((item) => item.req_id === requirement.req_id)
+        const match = result.items.find((item) => item.id === requirement.id)
         setLinkedTestCases(match?.test_cases ?? [])
       })
       .catch(() => {
         if (linkedTcRequestIdRef.current !== requestId) return
         setLinkedTestCases(null)
       })
-  }, [requirement, project?.id])
+  }, [requirement])
 
   function openHistory() {
     if (!requirement) return
@@ -160,6 +158,16 @@ export function RequirementDetailPage() {
           </Button>
         </div>
       </div>
+
+      {!requirement.is_current && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
+          Đây là phiên bản cũ (v{requirement.version}).{' '}
+          <button type="button" onClick={openHistory} className="underline underline-offset-4">
+            Xem lịch sử phiên bản
+          </button>{' '}
+          để tới phiên bản hiện tại.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
         <Card>
