@@ -58,7 +58,7 @@ export function RequirementsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [project?.id])
+  }, [project?.id, statusFilter, debouncedSearch])
 
   useEffect(() => {
     if (!project) {
