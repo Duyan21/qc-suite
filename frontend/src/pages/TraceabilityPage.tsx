@@ -32,11 +32,38 @@ function StatusIcon({ status }: { status: TraceabilityStatus }) {
   return <Diamond className="size-4 text-blue-500" aria-label="Linked — not run" />
 }
 
+// Caps the matrix to the visible viewport (instead of growing to the full row
+// count) so the horizontal scrollbar sits on-screen and doesn't require
+// scrolling the page down to reach it. Vertical scrolling happens inside this
+// box instead.
+function useViewportBoundedHeight(bottomMargin = 24) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [maxHeight, setMaxHeight] = useState<number>()
+
+  useEffect(() => {
+    function update() {
+      if (!ref.current) return
+      const top = ref.current.getBoundingClientRect().top
+      setMaxHeight(Math.max(window.innerHeight - top - bottomMargin, 200))
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [bottomMargin])
+
+  return { ref, maxHeight }
+}
+
 function TraceabilityMatrix({ items }: { items: TraceabilityRequirementItem[] }) {
   const columns = useMemo(() => deriveColumns(items), [items])
+  const { ref, maxHeight } = useViewportBoundedHeight()
 
   return (
-    <Table>
+    <Table
+      containerRef={ref}
+      containerClassName="overflow-y-auto"
+      containerStyle={{ maxHeight }}
+    >
       <TableHeader>
         <TableRow>
           <TableHead className="sticky left-0 z-10 bg-card">Requirement</TableHead>

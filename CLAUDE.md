@@ -70,8 +70,13 @@ Team members sync DB schema by running `alembic upgrade head`.
 
 ## Common Commands
 ```bash
-# Start database
-docker-compose up -d
+# One command from repo root: db container + backend + frontend together
+# (root package.json, via `concurrently` — see qc-suite/package.json)
+npm run dev
+
+# Same, run individually
+npm run dev:backend   # uvicorn --reload on :8000, uses backend/venv
+npm run dev:frontend  # vite dev on :5173
 
 # DB shell
 docker exec -it qcsuite_db psql -U qcsuite -d qcsuite_db
@@ -79,15 +84,11 @@ docker exec -it qcsuite_db psql -U qcsuite -d qcsuite_db
 \d table_name    # describe table
 \q               # quit
 
-# Backend
+# Backend — one-off tasks not covered by `npm run dev:backend`
 cd backend
 venv\Scripts\activate
 alembic upgrade head
 alembic revision --autogenerate -m "description"
-uvicorn main:app --reload --port 8000
-
-# Frontend
-cd frontend && npm run dev
 ```
 
 ## File Structure
