@@ -50,8 +50,12 @@ class TestCaseDetailResponse(TestCaseResponse):
     requirement: RequirementSummary | None = None
 
 
+class TestCaseListItem(TestCaseResponse):
+    requirement: RequirementSummary | None = None
+
+
 class TestCaseListResponse(BaseModel):
-    items: list[TestCaseResponse]
+    items: list[TestCaseListItem]
     total: int
     page: int
     limit: int
