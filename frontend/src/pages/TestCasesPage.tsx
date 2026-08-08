@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +24,8 @@ import {
   type TestCaseStatus,
   type TestCasePriority,
 } from '@/lib/testCases'
+import { NewTestCaseDialog } from '@/components/NewTestCaseDialog'
+import { useToast } from '@/lib/toast'
 
 const PAGE_SIZE = 20
 const STATUS_OPTIONS: TestCaseStatus[] = ['Draft', 'Active', 'Deprecated']
@@ -39,6 +42,8 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 export function TestCasesPage() {
   const { project } = useCurrentProject()
+  const toast = useToast()
+  const [newOpen, setNewOpen] = useState(false)
   const [data, setData] = useState<TestCaseListResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -105,6 +110,15 @@ export function TestCasesPage() {
             {data ? `${data.total} test cases` : ' '}
           </p>
         </div>
+        <Button
+          type="button"
+          onClick={() => setNewOpen(true)}
+          disabled={!project}
+          className="w-full sm:w-auto"
+        >
+          <Plus />
+          New Test Case
+        </Button>
       </div>
 
       <Card>
@@ -244,6 +258,21 @@ export function TestCasesPage() {
           </div>
         )}
       </Card>
+
+      {project && (
+        <NewTestCaseDialog
+          open={newOpen}
+          onOpenChange={setNewOpen}
+          projectId={project.id}
+          onCreated={(tc) => {
+            load(project.id, page, statusFilter, priorityFilter, debouncedSearch)
+            toast.success(`Đã tạo test case ${tc.code}.`, {
+              href: `/testcases/${tc.id}`,
+              linkLabel: 'Xem test case →',
+            })
+          }}
+        />
+      )}
     </div>
   )
 }
