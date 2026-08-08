@@ -49,8 +49,8 @@ export function RequirementCombobox({ projectId, value, onChange }: RequirementC
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" className="w-full justify-start font-normal">
-          {value ? `${value.req_id} — ${value.title}` : 'Chọn requirement...'}
+        <Button type="button" variant="outline" className="w-full justify-start overflow-hidden font-normal">
+          <span className="truncate">{value ? `${value.req_id} — ${value.title}` : 'Chọn requirement...'}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-2" align="start">
