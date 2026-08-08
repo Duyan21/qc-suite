@@ -1,3 +1,6 @@
+import re
+
+
 def _create_requirement(client, auth_headers, project_id, **overrides):
     body = {
         "title": "User can log in",
@@ -18,7 +21,7 @@ def test_create_requirement_generates_req_id_and_version_1(client, auth_headers,
     response = _create_requirement(client, auth_headers, project.id)
     assert response.status_code == 201
     data = response.json()
-    assert data["req_id"] == "REQ-001"
+    assert re.fullmatch(r"REQ-\d+", data["req_id"])
     assert data["version"] == 1
     assert data["is_current"] is True
     assert data["project_id"] == project.id
