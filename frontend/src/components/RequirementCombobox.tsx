@@ -53,7 +53,7 @@ export function RequirementCombobox({ projectId, value, onChange }: RequirementC
           <span className="truncate">{value ? `${value.req_id} — ${value.title}` : 'Chọn requirement...'}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-2" align="start">
+      <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-2" align="start">
         <Input
           placeholder="Tìm requirement..."
           value={search}

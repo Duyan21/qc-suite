@@ -122,7 +122,7 @@ export function TestCasesPage() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <Input
             placeholder="Tìm test case..."
             value={search}
