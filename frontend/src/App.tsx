@@ -4,6 +4,7 @@ import { RequireAuth } from '@/layouts/RequireAuth'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
+import { RequirementDetailPage } from '@/pages/RequirementDetailPage'
 import { NAV_SECTIONS } from '@/nav'
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
               <Route key={item.path} path={item.path} element={item.element} />
             )),
           )}
+          <Route path="/requirements/:id" element={<RequirementDetailPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

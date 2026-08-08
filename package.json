@@ -1,0 +1,13 @@
+{
+  "name": "qc-suite",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "docker-compose up -d db && concurrently -n backend,frontend -c green,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "cd backend && venv\\Scripts\\python.exe -m uvicorn main:app --reload --port 8000",
+    "dev:frontend": "cd frontend && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
