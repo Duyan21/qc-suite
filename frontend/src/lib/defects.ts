@@ -26,7 +26,7 @@ export async function listDefects(
 ): Promise<DefectListResponse> {
   const query = new URLSearchParams()
   if (params.requirement_id !== undefined) query.set('requirement_id', String(params.requirement_id))
-  query.set('page', String(params.page ?? 1))
-  query.set('limit', String(params.limit ?? 1))
+  if (params.page) query.set('page', String(params.page))
+  if (params.limit) query.set('limit', String(params.limit))
   return authFetch<DefectListResponse>(`/defects?${query.toString()}`)
 }
