@@ -18,6 +18,20 @@ export type TestCaseListItem = {
   updated_at: string
 }
 
+export type TestCase = {
+  id: number
+  code: string
+  title: string
+  preconditions: string | null
+  steps: string | null
+  expected_result: string
+  priority: string | null
+  status: string
+  requirement_id: number | null
+  created_at: string
+  updated_at: string
+}
+
 export type TestCaseListResponse = {
   items: TestCaseListItem[]
   total: number
@@ -88,4 +102,15 @@ export async function listTestCases(params: TestCaseListParams = {}): Promise<Te
   if (params.priority) query.set('priority', params.priority)
   if (params.search) query.set('search', params.search)
   return authFetch<TestCaseListResponse>(`/test-cases?${query.toString()}`)
+}
+
+export async function createTestCase(payload: {
+  title: string
+  preconditions?: string
+  steps?: string
+  expected_result: string
+  priority: TestCasePriority
+  requirement_id: number
+}): Promise<TestCase> {
+  return authFetch<TestCase>('/test-cases', { method: 'POST', body: payload })
 }
