@@ -1,4 +1,7 @@
+import re
+
 from models.all_models import Project, Release, Requirement
+from services.code_generator import next_code
 
 
 def _create_requirement_row(db_session, **overrides):
@@ -8,7 +11,7 @@ def _create_requirement_row(db_session, **overrides):
     db_session.refresh(project)
 
     defaults = dict(
-        req_id="REQ-001",
+        req_id=next_code(db_session, Requirement, "req_id", "REQ"),
         version=1,
         title="User can log in",
         description="d",
@@ -54,7 +57,7 @@ def test_create_test_case_generates_code(client, auth_headers, db_session):
     response = _create_test_case(client, auth_headers, req.id)
     assert response.status_code == 201
     data = response.json()
-    assert data["code"] == "TC-001"
+    assert re.fullmatch(r"TC-\d+", data["code"])
     assert data["status"] == "Draft"
 
 
@@ -65,7 +68,7 @@ def test_create_test_case_rejects_unknown_requirement(client, auth_headers):
 
 def test_list_test_cases_filters_by_requirement_priority(client, auth_headers, db_session):
     req = _create_requirement_row(db_session)
-    other_req = _create_requirement_row(db_session, req_id="REQ-002")
+    other_req = _create_requirement_row(db_session)
     _create_test_case(client, auth_headers, req.id, priority="High")
     _create_test_case(client, auth_headers, other_req.id, priority="Low")
 
@@ -74,7 +77,9 @@ def test_list_test_cases_filters_by_requirement_priority(client, auth_headers, d
     assert data["total"] == 1
     assert data["items"][0]["requirement_id"] == req.id
 
-    response = client.get("/test-cases?priority=Low", headers=auth_headers)
+    # Scoped by requirement_id too, so this isn't polluted by other
+    # Low-priority test cases already committed in the shared dev DB.
+    response = client.get(f"/test-cases?requirement_id={other_req.id}&priority=Low", headers=auth_headers)
     data = response.json()
     assert data["total"] == 1
     assert data["items"][0]["priority"] == "Low"

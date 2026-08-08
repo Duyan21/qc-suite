@@ -1,4 +1,7 @@
+import re
+
 from models.all_models import Project, Requirement, TestCase
+from services.code_generator import next_code
 
 
 def _create_requirement_row(db_session, **overrides):
@@ -8,7 +11,7 @@ def _create_requirement_row(db_session, **overrides):
     db_session.refresh(project)
 
     defaults = dict(
-        req_id="REQ-001",
+        req_id=next_code(db_session, Requirement, "req_id", "REQ"),
         version=1,
         title="User can log in",
         description="d",
@@ -26,7 +29,7 @@ def _create_requirement_row(db_session, **overrides):
 
 def _create_test_case_row(db_session, requirement_id, **overrides):
     defaults = dict(
-        code="TC-001",
+        code=next_code(db_session, TestCase, "code", "TC"),
         title="Login with valid credentials",
         expected_result="User is redirected",
         priority="High",
@@ -48,7 +51,7 @@ def test_create_defect_generates_code(client, auth_headers):
         headers=auth_headers,
     )
     assert response.status_code == 201
-    assert response.json()["code"] == "DEF-001"
+    assert re.fullmatch(r"DEF-\d+", response.json()["code"])
 
 
 def test_create_defect_accepts_only_testcase_id(client, auth_headers, db_session):
@@ -87,19 +90,32 @@ def test_create_defect_rejects_unknown_fk(client, auth_headers):
     assert response.status_code == 400
 
 
-def test_list_defects_filters_by_severity_and_status(client, auth_headers):
-    client.post("/defects", json={"title": "A", "severity": "Critical", "status": "Open"}, headers=auth_headers)
-    client.post("/defects", json={"title": "B", "severity": "Low", "status": "Closed"}, headers=auth_headers)
+def test_list_defects_filters_by_severity_and_status(client, auth_headers, db_session):
+    # Scoped by testcase_id so the assertions aren't polluted by other
+    # defects already committed in the shared dev DB (e.g. seed data).
+    req = _create_requirement_row(db_session)
+    tc = _create_test_case_row(db_session, req.id)
 
-    response = client.get("/defects?severity=Critical", headers=auth_headers)
+    d1 = client.post(
+        "/defects",
+        json={"title": "A", "severity": "Critical", "status": "Open", "testcase_id": tc.id},
+        headers=auth_headers,
+    ).json()
+    d2 = client.post(
+        "/defects",
+        json={"title": "B", "severity": "Low", "status": "Closed", "testcase_id": tc.id},
+        headers=auth_headers,
+    ).json()
+
+    response = client.get(f"/defects?testcase_id={tc.id}&severity=Critical", headers=auth_headers)
     data = response.json()
     assert data["total"] == 1
-    assert data["items"][0]["severity"] == "Critical"
+    assert data["items"][0]["id"] == d1["id"]
 
-    response = client.get("/defects?status=Closed", headers=auth_headers)
+    response = client.get(f"/defects?testcase_id={tc.id}&status=Closed", headers=auth_headers)
     data = response.json()
     assert data["total"] == 1
-    assert data["items"][0]["status"] == "Closed"
+    assert data["items"][0]["id"] == d2["id"]
 
 
 def test_get_defect_detail_includes_linked_summaries(client, auth_headers, db_session):
