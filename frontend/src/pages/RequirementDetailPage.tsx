@@ -18,8 +18,11 @@ import {
   REQUIREMENT_STATUS_BADGE_CLASS,
   type Requirement,
 } from '@/lib/requirements'
-import { getTraceability, type TraceabilityTestCaseItem } from '@/lib/traceability'
+import { getTraceability, type TraceabilityStatus } from '@/lib/traceability'
 import { listDefects } from '@/lib/defects'
+import { listTestCases } from '@/lib/testCases'
+
+type LinkedTestCase = { id: number; code: string; title: string; status: TraceabilityStatus | null }
 
 export function RequirementDetailPage() {
   const { id } = useParams()
@@ -27,11 +30,13 @@ export function RequirementDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [linkedTestCases, setLinkedTestCases] = useState<TraceabilityTestCaseItem[] | null>(null)
+  const [linkedTestCases, setLinkedTestCases] = useState<LinkedTestCase[] | null>(null)
+  const [linkedTestCasesError, setLinkedTestCasesError] = useState(false)
   const [defectCount, setDefectCount] = useState<number | null>(null)
   const [history, setHistory] = useState<Requirement[] | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(false)
   const requestIdRef = useRef(0)
   const defectRequestIdRef = useRef(0)
   const linkedTcRequestIdRef = useRef(0)
@@ -83,19 +88,35 @@ export function RequirementDetailPage() {
   useEffect(() => {
     if (!requirement) {
       setLinkedTestCases(null)
+      setLinkedTestCasesError(false)
       return
     }
     const requestId = ++linkedTcRequestIdRef.current
     setLinkedTestCases(null)
-    getTraceability(requirement.project_id)
-      .then((result) => {
+    setLinkedTestCasesError(false)
+
+    const load = requirement.is_current
+      ? getTraceability(requirement.project_id).then((result) => {
+          const match = result.items.find((item) => item.id === requirement.id)
+          return (match?.test_cases ?? []).map((tc) => ({
+            id: tc.id,
+            code: tc.code,
+            title: tc.title,
+            status: tc.status,
+          }))
+        })
+      : listTestCases({ requirement_id: requirement.id, limit: 200 }).then((result) =>
+          result.items.map((tc) => ({ id: tc.id, code: tc.code, title: tc.title, status: null })),
+        )
+
+    load
+      .then((items) => {
         if (linkedTcRequestIdRef.current !== requestId) return
-        const match = result.items.find((item) => item.id === requirement.id)
-        setLinkedTestCases(match?.test_cases ?? [])
+        setLinkedTestCases(items)
       })
       .catch(() => {
         if (linkedTcRequestIdRef.current !== requestId) return
-        setLinkedTestCases(null)
+        setLinkedTestCasesError(true)
       })
   }, [requirement])
 
@@ -103,9 +124,10 @@ export function RequirementDetailPage() {
     if (!requirement) return
     setHistoryOpen(true)
     setHistoryLoading(true)
+    setHistoryError(false)
     getRequirementHistory(requirement.req_id)
       .then((versions) => setHistory(versions))
-      .catch(() => setHistory([]))
+      .catch(() => setHistoryError(true))
       .finally(() => setHistoryLoading(false))
   }
 
@@ -187,13 +209,16 @@ export function RequirementDetailPage() {
               <h2 className="mb-2 text-sm font-medium">
                 Test Cases liên kết ({passedCount}/{totalCount})
               </h2>
-              {linkedTestCases === null && (
+              {linkedTestCasesError && (
+                <p className="text-sm text-destructive">Không tải được danh sách test case liên kết.</p>
+              )}
+              {!linkedTestCasesError && linkedTestCases === null && (
                 <p className="text-sm text-muted-foreground">Đang tải...</p>
               )}
-              {linkedTestCases !== null && linkedTestCases.length === 0 && (
+              {!linkedTestCasesError && linkedTestCases !== null && linkedTestCases.length === 0 && (
                 <p className="text-sm text-muted-foreground">Chưa có test case nào được liên kết.</p>
               )}
-              {linkedTestCases !== null && linkedTestCases.length > 0 && (
+              {!linkedTestCasesError && linkedTestCases !== null && linkedTestCases.length > 0 && (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -223,6 +248,7 @@ export function RequirementDetailPage() {
                             </Badge>
                           )}
                           {tc.status === 'partial' && <Badge variant="outline">Chưa chạy</Badge>}
+                          {tc.status === null && <Badge variant="outline">—</Badge>}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -275,7 +301,10 @@ export function RequirementDetailPage() {
             <DialogDescription>Tất cả các phiên bản của requirement này.</DialogDescription>
           </DialogHeader>
           {historyLoading && <p className="text-sm text-muted-foreground">Đang tải...</p>}
-          {!historyLoading && history && (
+          {!historyLoading && historyError && (
+            <p className="text-sm text-destructive">Không tải được lịch sử phiên bản.</p>
+          )}
+          {!historyLoading && !historyError && history && (
             <Table>
               <TableHeader>
                 <TableRow>
