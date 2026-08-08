@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,11 +22,15 @@ import {
 import { getTraceability, type TraceabilityStatus } from '@/lib/traceability'
 import { listDefects } from '@/lib/defects'
 import { listTestCases } from '@/lib/testCases'
+import { NewTestCaseDialog } from '@/components/NewTestCaseDialog'
+import { useToast } from '@/lib/toast'
 
 type LinkedTestCase = { id: number; code: string; title: string; status: TraceabilityStatus | null }
 
 export function RequirementDetailPage() {
   const { id } = useParams()
+  const toast = useToast()
+  const [newTcOpen, setNewTcOpen] = useState(false)
   const [requirement, setRequirement] = useState<Requirement | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -85,19 +90,14 @@ export function RequirementDetailPage() {
       })
   }, [requirement])
 
-  useEffect(() => {
-    if (!requirement) {
-      setLinkedTestCases(null)
-      setLinkedTestCasesError(false)
-      return
-    }
+  function reloadLinkedTestCases(req: Requirement) {
     const requestId = ++linkedTcRequestIdRef.current
     setLinkedTestCases(null)
     setLinkedTestCasesError(false)
 
-    const load = requirement.is_current
-      ? getTraceability(requirement.project_id).then((result) => {
-          const match = result.items.find((item) => item.id === requirement.id)
+    const load = req.is_current
+      ? getTraceability(req.project_id).then((result) => {
+          const match = result.items.find((item) => item.id === req.id)
           return (match?.test_cases ?? []).map((tc) => ({
             id: tc.id,
             code: tc.code,
@@ -105,7 +105,7 @@ export function RequirementDetailPage() {
             status: tc.status,
           }))
         })
-      : listTestCases({ requirement_id: requirement.id, limit: 200 }).then((result) =>
+      : listTestCases({ requirement_id: req.id, limit: 200 }).then((result) =>
           result.items.map((tc) => ({ id: tc.id, code: tc.code, title: tc.title, status: null })),
         )
 
@@ -118,6 +118,16 @@ export function RequirementDetailPage() {
         if (linkedTcRequestIdRef.current !== requestId) return
         setLinkedTestCasesError(true)
       })
+  }
+
+  useEffect(() => {
+    if (!requirement) {
+      setLinkedTestCases(null)
+      setLinkedTestCasesError(false)
+      return
+    }
+    reloadLinkedTestCases(requirement)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requirement])
 
   function openHistory() {
@@ -174,6 +184,16 @@ export function RequirementDetailPage() {
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={openHistory}>
             History
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!requirement.is_current}
+            title={requirement.is_current ? undefined : 'Chỉ có thể thêm test case cho phiên bản hiện tại'}
+            onClick={() => setNewTcOpen(true)}
+          >
+            <Plus className="size-3.5" />
+            New Test Case
           </Button>
           <Button type="button" size="sm" disabled title="Chưa hỗ trợ">
             Link TC +
@@ -333,6 +353,26 @@ export function RequirementDetailPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <NewTestCaseDialog
+        open={newTcOpen}
+        onOpenChange={setNewTcOpen}
+        projectId={requirement.project_id}
+        lockedRequirement={{
+          id: requirement.id,
+          req_id: requirement.req_id,
+          version: requirement.version,
+          title: requirement.title,
+          status: requirement.status,
+        }}
+        onCreated={(tc) => {
+          reloadLinkedTestCases(requirement)
+          toast.success(`Đã tạo test case ${tc.code}.`, {
+            href: `/testcases/${tc.id}`,
+            linkLabel: 'Xem test case →',
+          })
+        }}
+      />
     </div>
   )
 }
