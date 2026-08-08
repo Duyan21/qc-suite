@@ -22,6 +22,7 @@ export function TestCaseDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const requestIdRef = useRef(0)
+  const historyRequestIdRef = useRef(0)
 
   useEffect(() => {
     if (!id) return
@@ -54,9 +55,17 @@ export function TestCaseDetailPage() {
       setHistory(null)
       return
     }
+    const requestId = ++historyRequestIdRef.current
+    setHistory(null)
     getTestCaseResults(testCase.id)
-      .then((rows) => setHistory(rows))
-      .catch(() => setHistory([]))
+      .then((rows) => {
+        if (historyRequestIdRef.current !== requestId) return
+        setHistory(rows)
+      })
+      .catch(() => {
+        if (historyRequestIdRef.current !== requestId) return
+        setHistory([])
+      })
   }, [testCase])
 
   if (loading) {
