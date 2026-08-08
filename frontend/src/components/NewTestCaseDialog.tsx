@@ -89,19 +89,19 @@ export function NewTestCaseDialog({
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>New Test Case</DialogTitle>
+            <DialogTitle>Test Case mới</DialogTitle>
             <DialogDescription>
               Tạo một test case mới{lockedRequirement ? ` cho ${lockedRequirement.req_id}` : ''}.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-tc-title">Title</Label>
+              <Label htmlFor="new-tc-title">Tiêu đề</Label>
               <Input
                 id="new-tc-title"
                 name="title"
                 required
-                placeholder="Đăng nhập thành công với thông tin hợp lệ"
+                placeholder="Nhập tiêu đề test case..."
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -119,7 +119,7 @@ export function NewTestCaseDialog({
               )}
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-tc-preconditions">Preconditions</Label>
+              <Label htmlFor="new-tc-preconditions">Điều kiện tiên quyết</Label>
               <Textarea
                 id="new-tc-preconditions"
                 name="preconditions"
@@ -128,7 +128,7 @@ export function NewTestCaseDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-tc-steps">Steps</Label>
+              <Label htmlFor="new-tc-steps">Các bước</Label>
               <Textarea
                 id="new-tc-steps"
                 name="steps"
@@ -137,7 +137,7 @@ export function NewTestCaseDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-tc-expected">Expected Result</Label>
+              <Label htmlFor="new-tc-expected">Kết quả mong đợi</Label>
               <Textarea
                 id="new-tc-expected"
                 name="expected_result"
@@ -147,7 +147,7 @@ export function NewTestCaseDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-tc-priority">Priority</Label>
+              <Label htmlFor="new-tc-priority">Độ ưu tiên</Label>
               <Select name="priority" defaultValue="Medium">
                 <SelectTrigger id="new-tc-priority" className="w-full">
                   <SelectValue />
@@ -163,7 +163,7 @@ export function NewTestCaseDialog({
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-              Cancel
+              Hủy
             </Button>
             <Button type="submit" disabled={submitting || !requirement}>
               {submitting ? 'Đang tạo...' : 'Tạo'}

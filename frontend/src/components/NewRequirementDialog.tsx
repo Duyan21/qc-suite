@@ -73,21 +73,21 @@ export function NewRequirementDialog({
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>New Requirement</DialogTitle>
+            <DialogTitle>Requirement mới</DialogTitle>
             <DialogDescription>Tạo một requirement mới cho dự án hiện tại.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-req-title">Title</Label>
+              <Label htmlFor="new-req-title">Tiêu đề</Label>
               <Input
                 id="new-req-title"
                 name="title"
                 required
-                placeholder="Người dùng có thể đăng nhập bằng email"
+                placeholder="Nhập tiêu đề requirement..."
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-req-description">Description</Label>
+              <Label htmlFor="new-req-description">Mô tả</Label>
               <Textarea
                 id="new-req-description"
                 name="description"
@@ -97,7 +97,7 @@ export function NewRequirementDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-req-status">Status</Label>
+              <Label htmlFor="new-req-status">Trạng thái</Label>
               <Select name="status" defaultValue="Draft">
                 <SelectTrigger id="new-req-status" className="w-full">
                   <SelectValue />
@@ -113,7 +113,7 @@ export function NewRequirementDialog({
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-              Cancel
+              Hủy
             </Button>
             <Button type="submit" disabled={submitting}>
               {submitting ? 'Đang tạo...' : 'Tạo'}
