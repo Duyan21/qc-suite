@@ -64,3 +64,12 @@ export async function getRequirement(id: number): Promise<Requirement> {
 export async function getRequirementHistory(reqId: string): Promise<Requirement[]> {
   return authFetch<Requirement[]>(`/requirements/${encodeURIComponent(reqId)}/history`)
 }
+
+export async function createRequirement(payload: {
+  title: string
+  description: string
+  status: RequirementStatus
+  project_id: number
+}): Promise<Requirement> {
+  return authFetch<Requirement>('/requirements', { method: 'POST', body: payload })
+}
