@@ -1,9 +1,10 @@
 from models.all_models import Release, Requirement, TestCase, TestRun, TestRunResult
+from services.code_generator import next_code
 
 
 def _create_requirement(db_session, project_id, **overrides):
     defaults = dict(
-        req_id="REQ-001",
+        req_id=next_code(db_session, Requirement, "req_id", "REQ"),
         version=1,
         title="User can log in",
         description="d",
@@ -21,7 +22,7 @@ def _create_requirement(db_session, project_id, **overrides):
 
 def _create_test_case(db_session, requirement_id, **overrides):
     defaults = dict(
-        code="TC-001",
+        code=next_code(db_session, TestCase, "code", "TC"),
         title="Login with valid credentials",
         expected_result="User is redirected",
         priority="High",
@@ -76,10 +77,10 @@ def test_traceability_flags_uncovered_requirement(client, auth_headers, project,
 
 def test_traceability_status_mapping_and_coverage_percent(client, auth_headers, project, db_session):
     req = _create_requirement(db_session, project.id)
-    tc_pass = _create_test_case(db_session, req.id, code="TC-001")
-    tc_fail = _create_test_case(db_session, req.id, code="TC-002")
-    tc_skip = _create_test_case(db_session, req.id, code="TC-003")
-    tc_never_run = _create_test_case(db_session, req.id, code="TC-004")
+    tc_pass = _create_test_case(db_session, req.id)
+    tc_fail = _create_test_case(db_session, req.id)
+    tc_skip = _create_test_case(db_session, req.id)
+    tc_never_run = _create_test_case(db_session, req.id)
 
     release = Release(project_id=project.id, version_name="v1.0.0")
     db_session.add(release)
@@ -97,10 +98,10 @@ def test_traceability_status_mapping_and_coverage_percent(client, auth_headers, 
     assert item["coverage_percent"] == 0.25
 
     statuses = {tc["code"]: tc["status"] for tc in item["test_cases"]}
-    assert statuses["TC-001"] == "covered"
-    assert statuses["TC-002"] == "failed"
-    assert statuses["TC-003"] == "partial"
-    assert statuses["TC-004"] == "partial"
+    assert statuses[tc_pass.code] == "covered"
+    assert statuses[tc_fail.code] == "failed"
+    assert statuses[tc_skip.code] == "partial"
+    assert statuses[tc_never_run.code] == "partial"
 
 
 def test_traceability_latest_run_wins(client, auth_headers, project, db_session):
@@ -132,10 +133,11 @@ def test_traceability_excludes_other_projects_and_old_versions(client, auth_head
     db_session.add(other_project)
     db_session.commit()
     db_session.refresh(other_project)
-    _create_requirement(db_session, other_project.id, req_id="REQ-999")
+    _create_requirement(db_session, other_project.id)
 
-    old_version = _create_requirement(db_session, project.id, req_id="REQ-001", version=1, is_current=False)
-    _create_requirement(db_session, project.id, req_id="REQ-001", version=2, is_current=True, previous_version_id=old_version.id)
+    versioned_req_id = next_code(db_session, Requirement, "req_id", "REQ")
+    old_version = _create_requirement(db_session, project.id, req_id=versioned_req_id, version=1, is_current=False)
+    _create_requirement(db_session, project.id, req_id=versioned_req_id, version=2, is_current=True, previous_version_id=old_version.id)
 
     response = client.get(f"/traceability?project_id={project.id}", headers=auth_headers)
     data = response.json()
@@ -144,7 +146,8 @@ def test_traceability_excludes_other_projects_and_old_versions(client, auth_head
 
 
 def test_traceability_new_version_does_not_inherit_old_version_coverage(client, auth_headers, project, db_session):
-    old_version = _create_requirement(db_session, project.id, req_id="REQ-001", version=1, is_current=False)
+    versioned_req_id = next_code(db_session, Requirement, "req_id", "REQ")
+    old_version = _create_requirement(db_session, project.id, req_id=versioned_req_id, version=1, is_current=False)
     tc = _create_test_case(db_session, old_version.id)
 
     release = Release(project_id=project.id, version_name="v1.0.0")
@@ -157,7 +160,7 @@ def test_traceability_new_version_does_not_inherit_old_version_coverage(client, 
     _create_requirement(
         db_session,
         project.id,
-        req_id="REQ-001",
+        req_id=versioned_req_id,
         version=2,
         is_current=True,
         previous_version_id=old_version.id,

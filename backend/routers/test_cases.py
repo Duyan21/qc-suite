@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from models.all_models import Release, Requirement, TestCase, TestRun, TestRunResult
+from models.all_models import Project, Release, Requirement, TestCase, TestRun, TestRunResult
 from models.base import get_db
 from schemas.common import RequirementSummary
 from schemas.test_cases import (
@@ -10,6 +11,7 @@ from schemas.test_cases import (
     TestCaseCreate,
     TestCaseDetailResponse,
     TestCaseExecutionHistoryItem,
+    TestCaseListItem,
     TestCaseListResponse,
     TestCaseResponse,
     TestCaseUpdate,
@@ -27,20 +29,32 @@ router = APIRouter(
 
 @router.get("", response_model=TestCaseListResponse)
 def list_test_cases(
+    project_id: int | None = None,
     requirement_id: int | None = None,
     priority: str | None = None,
     status_filter: str | None = Query(None, alias="status"),
+    search: str | None = None,
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
     query = db.query(TestCase)
+    if project_id is not None:
+        if db.get(Project, project_id) is None:
+            raise HTTPException(status_code=404, detail="project_id not found")
+        query = query.join(Requirement, TestCase.requirement_id == Requirement.id).filter(
+            Requirement.project_id == project_id
+        )
     if requirement_id is not None:
         query = query.filter(TestCase.requirement_id == requirement_id)
     if priority is not None:
         query = query.filter(TestCase.priority == priority)
     if status_filter is not None:
         query = query.filter(TestCase.status == status_filter)
+    if search is not None:
+        query = query.filter(
+            or_(TestCase.title.ilike(f"%{search}%"), TestCase.code.ilike(f"%{search}%"))
+        )
 
     total = query.count()
     items = (
@@ -49,7 +63,21 @@ def list_test_cases(
         .limit(limit)
         .all()
     )
-    return TestCaseListResponse(items=items, total=total, page=page, limit=limit)
+
+    requirement_ids = {tc.requirement_id for tc in items if tc.requirement_id is not None}
+    requirements_by_id = {}
+    if requirement_ids:
+        for req in db.query(Requirement).filter(Requirement.id.in_(requirement_ids)).all():
+            requirements_by_id[req.id] = req
+
+    list_items = []
+    for tc in items:
+        list_item = TestCaseListItem.model_validate(tc)
+        req = requirements_by_id.get(tc.requirement_id)
+        list_item.requirement = RequirementSummary.model_validate(req) if req else None
+        list_items.append(list_item)
+
+    return TestCaseListResponse(items=list_items, total=total, page=page, limit=limit)
 
 
 @router.post("", response_model=TestCaseResponse, status_code=status.HTTP_201_CREATED)
