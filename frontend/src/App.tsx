@@ -5,6 +5,7 @@ import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { RequirementDetailPage } from '@/pages/RequirementDetailPage'
+import { TestCaseDetailPage } from '@/pages/TestCaseDetailPage'
 import { NAV_SECTIONS } from '@/nav'
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
             )),
           )}
           <Route path="/requirements/:id" element={<RequirementDetailPage />} />
+          <Route path="/testcases/:id" element={<TestCaseDetailPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
