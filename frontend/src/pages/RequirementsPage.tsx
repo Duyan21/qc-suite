@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +23,8 @@ import {
   type RequirementStatus,
 } from '@/lib/requirements'
 import { getTraceability, type TraceabilityResponse } from '@/lib/traceability'
+import { NewRequirementDialog } from '@/components/NewRequirementDialog'
+import { useToast } from '@/lib/toast'
 
 const PAGE_SIZE = 20
 const STATUS_OPTIONS: RequirementStatus[] = ['Draft', 'Active', 'Deprecated']
@@ -37,6 +40,8 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 export function RequirementsPage() {
   const { project } = useCurrentProject()
+  const toast = useToast()
+  const [newOpen, setNewOpen] = useState(false)
   const [data, setData] = useState<RequirementListResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -121,6 +126,15 @@ export function RequirementsPage() {
             {data ? `${data.total} requirements` : ' '}
           </p>
         </div>
+        <Button
+          type="button"
+          onClick={() => setNewOpen(true)}
+          disabled={!project}
+          className="w-full sm:w-auto"
+        >
+          <Plus />
+          New Requirement
+        </Button>
       </div>
 
       <Card>
@@ -229,6 +243,21 @@ export function RequirementsPage() {
           </div>
         )}
       </Card>
+
+      {project && (
+        <NewRequirementDialog
+          open={newOpen}
+          onOpenChange={setNewOpen}
+          projectId={project.id}
+          onCreated={(req) => {
+            load(project.id, page, statusFilter, debouncedSearch)
+            toast.success(`Đã tạo requirement ${req.req_id}.`, {
+              href: `/requirements/${req.id}`,
+              linkLabel: 'Xem requirement →',
+            })
+          }}
+        />
+      )}
     </div>
   )
 }
