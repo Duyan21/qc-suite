@@ -136,6 +136,86 @@ def test_list_defects_filters_by_severity_and_status(client, auth_headers, db_se
     assert data["items"][0]["id"] == d2["id"]
 
 
+def test_list_defects_scoped_by_project(client, auth_headers, db_session, project):
+    other_project = Project(name="Other Project", description="d")
+    db_session.add(other_project)
+    db_session.commit()
+    db_session.refresh(other_project)
+
+    client.post(
+        "/defects",
+        json={"title": "In scope", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    )
+    client.post(
+        "/defects",
+        json={"title": "Out of scope", "severity": "Low", "status": "Open", "project_id": other_project.id},
+        headers=auth_headers,
+    )
+
+    response = client.get(f"/defects?project_id={project.id}", headers=auth_headers)
+    data = response.json()
+    assert all(item["project_id"] == project.id for item in data["items"])
+    assert any(item["title"] == "In scope" for item in data["items"])
+    assert not any(item["title"] == "Out of scope" for item in data["items"])
+
+
+def test_list_defects_rejects_unknown_project(client, auth_headers):
+    response = client.get("/defects?project_id=999999", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_list_defects_search_matches_title_or_code(client, auth_headers, db_session, project):
+    req = _create_requirement_row(db_session)
+    tc = _create_test_case_row(db_session, req.id)
+    d1 = client.post(
+        "/defects",
+        json={"title": "Login fails with OTP", "severity": "Low", "status": "Open", "testcase_id": tc.id, "project_id": project.id},
+        headers=auth_headers,
+    ).json()
+    client.post(
+        "/defects",
+        json={"title": "Report export missing column", "severity": "Low", "status": "Open", "testcase_id": tc.id, "project_id": project.id},
+        headers=auth_headers,
+    )
+
+    response = client.get(f"/defects?testcase_id={tc.id}&search=OTP", headers=auth_headers)
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["id"] == d1["id"]
+
+    code_response = client.get(f"/defects?testcase_id={tc.id}&search={d1['code']}", headers=auth_headers)
+    code_data = code_response.json()
+    assert code_data["total"] == 1
+    assert code_data["items"][0]["id"] == d1["id"]
+
+
+def test_list_defects_includes_test_case_summary(client, auth_headers, db_session, project):
+    req = _create_requirement_row(db_session)
+    tc = _create_test_case_row(db_session, req.id)
+    client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "testcase_id": tc.id, "project_id": project.id},
+        headers=auth_headers,
+    )
+
+    response = client.get(f"/defects?testcase_id={tc.id}", headers=auth_headers)
+    data = response.json()
+    assert data["items"][0]["test_case"]["code"] == tc.code
+
+
+def test_list_defects_omits_test_case_when_unlinked(client, auth_headers, project):
+    client.post(
+        "/defects",
+        json={"title": "Standalone bug", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    )
+
+    response = client.get(f"/defects?project_id={project.id}&search=Standalone", headers=auth_headers)
+    data = response.json()
+    assert data["items"][0]["test_case"] is None
+
+
 def test_get_defect_detail_includes_linked_summaries(client, auth_headers, db_session, project):
     req = _create_requirement_row(db_session)
     tc = _create_test_case_row(db_session, req.id)

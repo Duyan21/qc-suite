@@ -48,8 +48,12 @@ class DefectDetailResponse(DefectResponse):
     requirement: RequirementSummary | None = None
 
 
+class DefectListItem(DefectResponse):
+    test_case: TestCaseSummary | None = None
+
+
 class DefectListResponse(BaseModel):
-    items: list[DefectResponse]
+    items: list[DefectListItem]
     total: int
     page: int
     limit: int
