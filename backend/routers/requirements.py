@@ -88,6 +88,8 @@ def update_requirement(
     old = db.get(Requirement, id)
     if old is None:
         raise HTTPException(status_code=404, detail="Requirement not found")
+    if not old.is_current:
+        raise HTTPException(status_code=400, detail="Requirement is not the current version")
 
     old.is_current = False
 

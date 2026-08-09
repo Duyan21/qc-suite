@@ -126,6 +126,21 @@ def test_update_requirement_creates_new_version_and_history_has_three(client, au
     assert history[2]["is_current"] is True
 
 
+def test_update_requirement_rejects_non_current_version(client, auth_headers, project):
+    v1 = _create_requirement(client, auth_headers, project.id).json()
+
+    update_body = {
+        "title": "User can log in (v2)",
+        "description": "Adds OTP step",
+        "status": "Active",
+    }
+    client.put(f"/requirements/{v1['id']}", json=update_body, headers=auth_headers)
+
+    # v1 is no longer current — a second PUT against it must be rejected
+    response = client.put(f"/requirements/{v1['id']}", json=update_body, headers=auth_headers)
+    assert response.status_code == 400
+
+
 def test_requirements_require_auth(client, project):
     response = client.get(f"/requirements?project_id={project.id}")
     assert response.status_code == 401
