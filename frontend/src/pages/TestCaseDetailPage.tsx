@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Pencil, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -120,9 +121,11 @@ export function TestCaseDetailPage() {
             disabled={!project}
             onClick={() => setEditOpen(true)}
           >
+            <Pencil className="size-3.5" />
             Sửa
           </Button>
           <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="size-3.5" />
             Xóa
           </Button>
         </div>

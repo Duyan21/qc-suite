@@ -75,7 +75,7 @@ export function RequirementCombobox({ projectId, value, onChange }: RequirementC
                   onChange(req)
                   setOpen(false)
                 }}
-                className="rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                className="cursor-pointer rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
               >
                 <span className="font-medium">{req.req_id}</span>{' '}
                 <span className="text-muted-foreground">{req.title}</span>

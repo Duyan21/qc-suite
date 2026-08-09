@@ -96,7 +96,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               type="button"
               onClick={() => dismiss(t.id)}
               aria-label="Đóng"
-              className="shrink-0 opacity-70 hover:opacity-100"
+              className="shrink-0 cursor-pointer opacity-70 hover:opacity-100"
             >
               <XIcon className="size-3.5" />
             </button>
