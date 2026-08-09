@@ -120,10 +120,10 @@ export function TestCaseDetailPage() {
             disabled={!project}
             onClick={() => setEditOpen(true)}
           >
-            Edit
+            Sửa
           </Button>
           <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
-            Delete
+            Xóa
           </Button>
         </div>
       </div>
