@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from models.all_models import Defect, Requirement, TestCase
+from models.all_models import Defect, Project, Requirement, TestCase
 from models.base import get_db
 from schemas.common import RequirementSummary, TestCaseSummary
 from schemas.defects import (
@@ -53,6 +53,8 @@ def list_defects(
 
 @router.post("", response_model=DefectResponse, status_code=status.HTTP_201_CREATED)
 def create_defect(payload: DefectCreate, db: Session = Depends(get_db)):
+    if db.get(Project, payload.project_id) is None:
+        raise HTTPException(status_code=400, detail="project_id not found")
     if payload.testcase_id is not None and db.get(TestCase, payload.testcase_id) is None:
         raise HTTPException(status_code=400, detail="testcase_id not found")
     if payload.requirement_id is not None and db.get(Requirement, payload.requirement_id) is None:
@@ -67,6 +69,7 @@ def create_defect(payload: DefectCreate, db: Session = Depends(get_db)):
         status=payload.status,
         testcase_id=payload.testcase_id,
         requirement_id=payload.requirement_id,
+        project_id=payload.project_id,
     )
     db.add(defect)
     db.commit()

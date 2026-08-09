@@ -146,7 +146,7 @@ def seed_test_cases(db, requirements, tc_data):
     return test_cases
 
 
-def seed_defects(db, test_cases, requirements, defect_data, releases):
+def seed_defects(db, project, test_cases, requirements, defect_data, releases):
     fixed_in = next(r for r in releases if r.version_name == "v1.1.0-UAT").version_name
     defects = {}
     for row in defect_data:
@@ -168,6 +168,7 @@ def seed_defects(db, test_cases, requirements, defect_data, releases):
             requirement_id=requirements[row["req_id"]].id if row["req_id"] else None,
             found_in_version=row["environment"],
             fixed_in_version=fixed_in if row["status"] in CLOSED_DEFECT_STATUSES else None,
+            project_id=project.id,
         )
         db.add(defect)
         defects[row["def_id"]] = defect
@@ -236,7 +237,7 @@ def main():
         releases = seed_releases(db, project)
         requirements = seed_requirements(db, project, req_data)
         test_cases = seed_test_cases(db, requirements, tc_data)
-        defects = seed_defects(db, test_cases, requirements, defect_data, releases)
+        defects = seed_defects(db, project, test_cases, requirements, defect_data, releases)
         results = seed_test_runs(db, releases, test_cases, defect_data)
 
         db.commit()

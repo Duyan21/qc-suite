@@ -16,6 +16,7 @@ class DefectCreate(BaseModel):
     status: DefectStatus = "Open"
     testcase_id: int | None = None
     requirement_id: int | None = None
+    project_id: int
 
 
 class DefectUpdate(BaseModel):
@@ -35,6 +36,7 @@ class DefectResponse(BaseModel):
     requirement_id: int | None
     found_in_version: str | None
     fixed_in_version: str | None
+    project_id: int
     created_at: datetime
 
     class Config:

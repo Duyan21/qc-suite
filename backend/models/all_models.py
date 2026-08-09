@@ -81,6 +81,7 @@ class Defect(Base):
     __tablename__ = "defects"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     code = Column(String(20), unique=True, nullable=False)
     title = Column(Text, nullable=False)
     description = Column(Text)

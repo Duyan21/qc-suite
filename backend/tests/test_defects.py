@@ -44,22 +44,40 @@ def _create_test_case_row(db_session, requirement_id, **overrides):
     return tc
 
 
-def test_create_defect_generates_code(client, auth_headers):
+def test_create_defect_generates_code(client, auth_headers, project):
     response = client.post(
         "/defects",
-        json={"title": "Login fails with OTP", "severity": "High", "status": "Open"},
+        json={"title": "Login fails with OTP", "severity": "High", "status": "Open", "project_id": project.id},
         headers=auth_headers,
     )
     assert response.status_code == 201
     assert re.fullmatch(r"DEF-\d+", response.json()["code"])
 
 
-def test_create_defect_accepts_only_testcase_id(client, auth_headers, db_session):
+def test_create_defect_requires_project_id(client, auth_headers):
+    response = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+def test_create_defect_rejects_unknown_project(client, auth_headers):
+    response = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": 999999},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
+def test_create_defect_accepts_only_testcase_id(client, auth_headers, db_session, project):
     req = _create_requirement_row(db_session)
     tc = _create_test_case_row(db_session, req.id)
     response = client.post(
         "/defects",
-        json={"title": "Bug", "severity": "Low", "status": "Open", "testcase_id": tc.id},
+        json={"title": "Bug", "severity": "Low", "status": "Open", "testcase_id": tc.id, "project_id": project.id},
         headers=auth_headers,
     )
     assert response.status_code == 201
@@ -68,11 +86,11 @@ def test_create_defect_accepts_only_testcase_id(client, auth_headers, db_session
     assert data["requirement_id"] is None
 
 
-def test_create_defect_accepts_only_requirement_id(client, auth_headers, db_session):
+def test_create_defect_accepts_only_requirement_id(client, auth_headers, db_session, project):
     req = _create_requirement_row(db_session)
     response = client.post(
         "/defects",
-        json={"title": "Bug", "severity": "Low", "status": "Open", "requirement_id": req.id},
+        json={"title": "Bug", "severity": "Low", "status": "Open", "requirement_id": req.id, "project_id": project.id},
         headers=auth_headers,
     )
     assert response.status_code == 201
@@ -81,16 +99,16 @@ def test_create_defect_accepts_only_requirement_id(client, auth_headers, db_sess
     assert data["testcase_id"] is None
 
 
-def test_create_defect_rejects_unknown_fk(client, auth_headers):
+def test_create_defect_rejects_unknown_fk(client, auth_headers, project):
     response = client.post(
         "/defects",
-        json={"title": "Bug", "severity": "Low", "status": "Open", "testcase_id": 999999},
+        json={"title": "Bug", "severity": "Low", "status": "Open", "testcase_id": 999999, "project_id": project.id},
         headers=auth_headers,
     )
     assert response.status_code == 400
 
 
-def test_list_defects_filters_by_severity_and_status(client, auth_headers, db_session):
+def test_list_defects_filters_by_severity_and_status(client, auth_headers, db_session, project):
     # Scoped by testcase_id so the assertions aren't polluted by other
     # defects already committed in the shared dev DB (e.g. seed data).
     req = _create_requirement_row(db_session)
@@ -98,12 +116,12 @@ def test_list_defects_filters_by_severity_and_status(client, auth_headers, db_se
 
     d1 = client.post(
         "/defects",
-        json={"title": "A", "severity": "Critical", "status": "Open", "testcase_id": tc.id},
+        json={"title": "A", "severity": "Critical", "status": "Open", "testcase_id": tc.id, "project_id": project.id},
         headers=auth_headers,
     ).json()
     d2 = client.post(
         "/defects",
-        json={"title": "B", "severity": "Low", "status": "Closed", "testcase_id": tc.id},
+        json={"title": "B", "severity": "Low", "status": "Closed", "testcase_id": tc.id, "project_id": project.id},
         headers=auth_headers,
     ).json()
 
@@ -118,7 +136,7 @@ def test_list_defects_filters_by_severity_and_status(client, auth_headers, db_se
     assert data["items"][0]["id"] == d2["id"]
 
 
-def test_get_defect_detail_includes_linked_summaries(client, auth_headers, db_session):
+def test_get_defect_detail_includes_linked_summaries(client, auth_headers, db_session, project):
     req = _create_requirement_row(db_session)
     tc = _create_test_case_row(db_session, req.id)
     created = client.post(
@@ -129,6 +147,7 @@ def test_get_defect_detail_includes_linked_summaries(client, auth_headers, db_se
             "status": "Open",
             "testcase_id": tc.id,
             "requirement_id": req.id,
+            "project_id": project.id,
         },
         headers=auth_headers,
     ).json()
@@ -140,12 +159,12 @@ def test_get_defect_detail_includes_linked_summaries(client, auth_headers, db_se
     assert data["requirement"]["req_id"] == req.req_id
 
 
-def test_get_defect_detail_with_only_testcase_id_omits_requirement(client, auth_headers, db_session):
+def test_get_defect_detail_with_only_testcase_id_omits_requirement(client, auth_headers, db_session, project):
     req = _create_requirement_row(db_session)
     tc = _create_test_case_row(db_session, req.id)
     created = client.post(
         "/defects",
-        json={"title": "Bug", "severity": "High", "status": "Open", "testcase_id": tc.id},
+        json={"title": "Bug", "severity": "High", "status": "Open", "testcase_id": tc.id, "project_id": project.id},
         headers=auth_headers,
     ).json()
 
@@ -156,11 +175,11 @@ def test_get_defect_detail_with_only_testcase_id_omits_requirement(client, auth_
     assert data["requirement"] is None
 
 
-def test_get_defect_detail_with_only_requirement_id_omits_test_case(client, auth_headers, db_session):
+def test_get_defect_detail_with_only_requirement_id_omits_test_case(client, auth_headers, db_session, project):
     req = _create_requirement_row(db_session)
     created = client.post(
         "/defects",
-        json={"title": "Bug", "severity": "High", "status": "Open", "requirement_id": req.id},
+        json={"title": "Bug", "severity": "High", "status": "Open", "requirement_id": req.id, "project_id": project.id},
         headers=auth_headers,
     ).json()
 
@@ -171,10 +190,10 @@ def test_get_defect_detail_with_only_requirement_id_omits_test_case(client, auth
     assert data["test_case"] is None
 
 
-def test_get_defect_detail_with_no_links_omits_both(client, auth_headers):
+def test_get_defect_detail_with_no_links_omits_both(client, auth_headers, project):
     created = client.post(
         "/defects",
-        json={"title": "Bug", "severity": "High", "status": "Open"},
+        json={"title": "Bug", "severity": "High", "status": "Open", "project_id": project.id},
         headers=auth_headers,
     ).json()
 
@@ -185,10 +204,10 @@ def test_get_defect_detail_with_no_links_omits_both(client, auth_headers):
     assert data["requirement"] is None
 
 
-def test_update_defect_changes_severity_status_fixed_in_version(client, auth_headers):
+def test_update_defect_changes_severity_status_fixed_in_version(client, auth_headers, project):
     created = client.post(
         "/defects",
-        json={"title": "Bug", "severity": "Low", "status": "Open"},
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id},
         headers=auth_headers,
     ).json()
 
