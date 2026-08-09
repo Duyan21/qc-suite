@@ -163,3 +163,42 @@ def test_list_requirements_paginates_across_pages(client, auth_headers, project)
     page2_ids = [item["id"] for item in page2["items"]]
     assert page2_ids == [r3["id"]]
     assert not set(page2_ids) & set(page1_ids)
+
+
+def test_delete_requirement_creates_deprecated_version(client, auth_headers, project):
+    v1 = _create_requirement(client, auth_headers, project.id).json()
+
+    response = client.delete(f"/requirements/{v1['id']}", headers=auth_headers)
+    assert response.status_code == 200
+    deleted = response.json()
+    assert deleted["status"] == "Deprecated"
+    assert deleted["version"] == 2
+    assert deleted["is_current"] is True
+    assert deleted["previous_version_id"] == v1["id"]
+    assert deleted["req_id"] == v1["req_id"]
+    assert deleted["title"] == v1["title"]
+    assert deleted["description"] == v1["description"]
+    assert deleted["change_note"] is None
+
+    old = client.get(f"/requirements/{v1['id']}", headers=auth_headers).json()
+    assert old["is_current"] is False
+
+
+def test_delete_requirement_missing_returns_404(client, auth_headers):
+    response = client.delete("/requirements/999999", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_delete_requirement_rejects_non_current_version(client, auth_headers, project):
+    v1 = _create_requirement(client, auth_headers, project.id).json()
+    client.delete(f"/requirements/{v1['id']}", headers=auth_headers)
+
+    response = client.delete(f"/requirements/{v1['id']}", headers=auth_headers)
+    assert response.status_code == 400
+
+
+def test_delete_requirement_requires_auth(client, project):
+    # The auth dependency rejects before the id is looked up, so the specific
+    # id value doesn't matter here — no need to create a real requirement first.
+    response = client.delete("/requirements/1")
+    assert response.status_code == 401
