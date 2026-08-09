@@ -70,6 +70,13 @@ Recorded so implementation doesn't re-litigate them:
    `defaultValue`-populated from the test case being edited. `DeleteTestCaseDialog` is one
    reusable component used from both entry points (detail page and list row), not
    duplicated.
+9. **Error feedback — deliberate deviation from the create-flow convention**: the
+   create-flow dialogs (`NewRequirementDialog`/`NewTestCaseDialog`) show failures as inline
+   `text-destructive` text inside the dialog and never toast them. For Edit/Delete, that's
+   replaced: **failures show only as an error toast** (`toast.error(message)`), the same
+   channel as success. No inline error text in `EditTestCaseDialog` or
+   `DeleteTestCaseDialog`. The dialog still stays open with fields/state intact so the user
+   can retry (only the error-display channel changes, not the retry behavior).
 
 ## `EditTestCaseDialog.tsx` (`frontend/src/components/`)
 
@@ -87,8 +94,10 @@ Props: `{ open: boolean; onOpenChange: (v: boolean) => void; projectId: number; 
   `<input type="hidden" name="requirement_id">`. Submit disabled until a requirement is
   selected, same guard as Create.
 - On submit: `updateTestCase(testCase.id, payload)` → same `id` comes back (in-place
-  update) → `onUpdated(tc)`, `onOpenChange(false)`; on failure → inline `text-destructive`
-  line inside the dialog, dialog stays open so the user can retry.
+  update) → `onOpenChange(false)`, `onUpdated(tc)` (page fires the success toast, see
+  "Wiring into pages" below — same split as the create-flow dialogs); on failure →
+  `toast.error(message)` fired from inside this dialog itself (it's the one that knows the
+  request failed), dialog stays open with the entered values intact so the user can retry.
 - Submit button: `disabled={submitting || !requirement}`, label
   `submitting ? 'Đang lưu...' : 'Lưu'`.
 
@@ -100,8 +109,9 @@ Props: `{ open: boolean; onOpenChange: (v: boolean) => void; testCase: { id: num
 - Footer: `Hủy` (`variant="outline"`) / `Xóa` (`variant="destructive"`, already defined in
   `button.tsx` — no new styling).
 - On confirm: `setSubmitting(true)`; `deleteTestCase(testCase.id)`; on success →
-  `onDeleted(testCase.id)`, `onOpenChange(false)`; on failure → inline `text-destructive`
-  line inside the dialog, dialog stays open.
+  `onOpenChange(false)`, `onDeleted(testCase.id)` (page fires the success toast); on
+  failure → `toast.error(message)` fired from inside this dialog, dialog stays open so the
+  user can retry.
 - Delete button: `disabled={submitting}`, label `submitting ? 'Đang xóa...' : 'Xóa'`.
 
 ## Wiring into pages
@@ -132,9 +142,16 @@ Props: `{ open: boolean; onOpenChange: (v: boolean) => void; testCase: { id: num
 
 - Required-field validation leans on native HTML (`required`), same as the create dialogs.
 - Request-level failures (network error, 400 from a stale/deleted `requirement_id` on
-  edit, 404 if a test case was already deleted elsewhere) surface as an inline
-  `text-destructive` line inside the relevant dialog; dialog stays open. Toast only fires
-  on confirmed success, same convention as the create flow.
+  edit, 404 if a test case was already deleted elsewhere) surface as an **error toast**
+  (`toast.error(err instanceof Error ? err.message : 'Đã có lỗi xảy ra')`), fired from
+  inside `EditTestCaseDialog`/`DeleteTestCaseDialog` at the point of failure — not as
+  inline dialog text. This is a deliberate deviation from the create-flow dialogs
+  (`NewRequirementDialog`/`NewTestCaseDialog`), which keep their inline-text-only
+  convention unchanged. The dialog stays open with its current field values/state intact
+  on failure either way, so the user can retry without re-entering data.
+- Every Edit/Delete action now gives toast feedback on both outcomes: success toast fires
+  from the page-level `onUpdated`/`onDeleted` callback (see "Wiring into pages"), error
+  toast fires from inside the dialog itself.
 - 401 handling already global (`api.ts`), untouched.
 
 ## Verification plan
