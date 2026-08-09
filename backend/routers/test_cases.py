@@ -51,6 +51,8 @@ def list_test_cases(
         query = query.filter(TestCase.priority == priority)
     if status_filter is not None:
         query = query.filter(TestCase.status == status_filter)
+    else:
+        query = query.filter(TestCase.status != "Deprecated")
     if search is not None:
         query = query.filter(
             or_(TestCase.title.ilike(f"%{search}%"), TestCase.code.ilike(f"%{search}%"))
