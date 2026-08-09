@@ -202,3 +202,23 @@ def test_delete_requirement_requires_auth(client, project):
     # id value doesn't matter here — no need to create a real requirement first.
     response = client.delete("/requirements/1")
     assert response.status_code == 401
+
+
+def test_list_requirements_excludes_deprecated_by_default(client, auth_headers, project):
+    _create_requirement(client, auth_headers, project.id, title="Active one", status="Active")
+    deprecated_resp = _create_requirement(
+        client, auth_headers, project.id, title="Deprecated one", status="Deprecated"
+    )
+    deprecated = deprecated_resp.json()
+
+    response = client.get(f"/requirements?project_id={project.id}", headers=auth_headers)
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["title"] == "Active one"
+
+    explicit = client.get(
+        f"/requirements?project_id={project.id}&status=Deprecated", headers=auth_headers
+    )
+    explicit_data = explicit.json()
+    assert explicit_data["total"] == 1
+    assert explicit_data["items"][0]["id"] == deprecated["id"]

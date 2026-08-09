@@ -36,6 +36,8 @@ def list_requirements(
     )
     if status_filter is not None:
         query = query.filter(Requirement.status == status_filter)
+    else:
+        query = query.filter(Requirement.status != "Deprecated")
     if search is not None:
         query = query.filter(Requirement.title.ilike(f"%{search}%"))
 
