@@ -6,26 +6,44 @@ Status: Approved for planning
 ## Purpose
 
 Wire two already-existing backend `test_cases` endpoints into the frontend, following the
-same "no backend changes" approach as the create-flow (see
-`2026-08-08-create-requirement-testcase-design.md`):
+same approach as the create-flow (see `2026-08-08-create-requirement-testcase-design.md`),
+plus one small targeted change to the existing list endpoint's default filtering:
 - `PUT /test-cases/{id}` → an "Edit" flow on `TestCaseDetailPage`.
 - `DELETE /test-cases/{id}` → a "Delete" flow on `TestCaseDetailPage` and on
   `TestCasesPage`'s table rows.
+- `GET /test-cases` → default (no `status` param) now excludes `Deprecated`, so items set
+  to `Deprecated` via the new Delete button actually disappear from the default view.
 
 ## Backend
 
-**No backend changes.** Confirmed by reading `backend/routers/test_cases.py` and
-`backend/schemas/test_cases.py`:
+Confirmed by reading `backend/routers/test_cases.py` and `backend/schemas/test_cases.py`:
 
 - `PUT /test-cases/{id}` (`TestCaseUpdate`: `title`, `preconditions?`, `steps?`,
   `expected_result`, `priority`, `status`, `requirement_id`) → `TestCaseResponse`. Updates
   the row **in place** (no versioning — unlike `Requirement`, `TestCase` has no
   `version`/`is_current`/`change_note` columns). 400s if `requirement_id` doesn't exist.
   Re-triggers `trigger_embedding` when `title`/`steps`/`expected_result` changed (existing
-  behavior, untouched).
+  behavior, untouched). **No change needed.**
 - `DELETE /test-cases/{id}` (`TestCaseResponse`) → sets `status = "Deprecated"` on the row.
   Does not actually remove the row (soft-delete in name only; the UI still calls this
-  action "Delete" per product decision below).
+  action "Delete" per product decision below). **No change needed.**
+- `GET /test-cases` (`list_test_cases`) — **one small change**: today,
+  `status_filter` (query param `status`) only ever adds a filter when explicitly given; when
+  omitted, every status shows, including `Deprecated`. Add an `else` branch: when
+  `status_filter` is `None`, filter `TestCase.status != "Deprecated"`. An explicit
+  `?status=Deprecated` still works exactly as before (exact match, unaffected). This is a
+  tweak to existing logic in an existing endpoint, not a new endpoint or schema — the only
+  backend code change in this pass.
+  - **Ripple effect, called out explicitly**: every caller that fetches test cases without
+    a status filter is affected, not just `TestCasesPage`'s "All" option.
+    `RequirementDetailPage`'s `reloadLinkedTestCases` (for a historical/non-current
+    requirement version) also calls `listTestCases({ requirement_id, limit: 200 })` with no
+    status param, so Deprecated test cases linked to an old requirement version will also
+    stop appearing in that list. This is treated as correct/desired (consistent default
+    everywhere) rather than a special case to work around.
+  - `GET /test-cases/{id}` (single, by id) is untouched — always returns the row regardless
+    of status, which is required for `EditTestCaseDialog` to load and revive a Deprecated
+    test case (see below).
 
 ## Scope decisions (from brainstorming)
 
@@ -47,20 +65,17 @@ Recorded so implementation doesn't re-litigate them:
    one-click delete.
 5. **Delete lives in two places**: `TestCaseDetailPage`'s action row (next to the new Edit
    button) *and* a per-row action on `TestCasesPage`'s table — not just one.
-6. **Post-delete behavior differs by entry point**:
+6. **Post-delete behavior differs by entry point** (superseded in part by decision 10 below
+   — kept here for the instant-feedback behavior, which still applies):
    - From `TestCaseDetailPage`: navigate to `/testcases` (the item is gone from the page
      the user is looking at because they've left it).
    - From `TestCasesPage`'s row action: splice the row out of the current page's local
      list state immediately (no refetch) — the row visibly disappears without the page
-     reloading.
-   - Neither path changes `TestCasesPage`'s status-filter semantics. `Status: All`
-     continues to include `Deprecated` items exactly as it does today (whether they got
-     that status via this Delete button or via the Edit dialog's status field) — a fresh
-     load/refetch of the list will show a deleted item again, with its `Deprecated`
-     badge. Only the immediate, in-session UI action after clicking Delete removes it from
-     view. This was an explicit product decision: "Deprecated is a status of the test
-     case, but that test case is not deleted" — no new hide-by-default filtering logic is
-     added anywhere.
+     reloading or waiting on the backend filter change to take effect on the next fetch.
+   - `TestCasesPage`'s status-filter dropdown itself is unchanged — it still offers
+     `Draft`/`Active`/`Deprecated` as explicit choices, and picking `Deprecated` explicitly
+     still shows exactly those items (backend exact-match filtering, untouched). What
+     changed (decision 10) is only what the **default/"All"** selection returns.
 7. **Post-edit behavior**: `TestCaseDetailPage` merges the returned `TestCaseResponse`
    into local state in place (same `id`, no navigation needed — unlike the versioned
    design that was aborted).
@@ -70,13 +85,36 @@ Recorded so implementation doesn't re-litigate them:
    `defaultValue`-populated from the test case being edited. `DeleteTestCaseDialog` is one
    reusable component used from both entry points (detail page and list row), not
    duplicated.
-9. **Error feedback — deliberate deviation from the create-flow convention**: the
-   create-flow dialogs (`NewRequirementDialog`/`NewTestCaseDialog`) show failures as inline
-   `text-destructive` text inside the dialog and never toast them. For Edit/Delete, that's
-   replaced: **failures show only as an error toast** (`toast.error(message)`), the same
-   channel as success. No inline error text in `EditTestCaseDialog` or
-   `DeleteTestCaseDialog`. The dialog still stays open with fields/state intact so the user
-   can retry (only the error-display channel changes, not the retry behavior).
+9. **Backend list-filter change (follow-up decision)**: `GET /test-cases` with no `status`
+   param now excludes `Deprecated` (see "Backend" above). This is a change to existing
+   query logic, deliberately scoped in after confirming the alternative (client-side
+   filtering with pagination-count caveats, or a client-side dual-fetch-and-merge) was
+   worse than a small, targeted backend adjustment. `TestCasesPage`'s "All" filter option
+   needs no frontend code change to pick this up — it already passes `status: undefined`
+   for "All" today, so the new backend default applies automatically.
+10. **Status is not a free-form field — `Deprecated` is Delete-button-only**: neither the
+    Create dialog (which has no status field at all, and stays that way — `TestCaseCreate`
+    has no `status` param, backend always creates as `Draft`) nor `EditTestCaseDialog`'s
+    `status` `Select` offer `Deprecated` as a choice. The only way a test case becomes
+    `Deprecated` is clicking the Delete button. `EditTestCaseDialog`'s status options are
+    `Draft`/`Active` only (see the dialog section below for how a currently-Deprecated test
+    case is handled — the "switch back to Active or Draft" flow from decision 11).
+11. **Reviving a Deprecated test case happens through Edit**: since `Deprecated` isn't a
+    selectable target, `EditTestCaseDialog` must still let a user move a currently-Deprecated
+    test case back to `Draft` or `Active`. Because `Deprecated` isn't one of the two
+    `SelectItem`s, a test case whose current status is `Deprecated` gets **no** `defaultValue`
+    on the status `Select` — the trigger shows a placeholder (`Chọn trạng thái...`) instead of
+    a pre-filled value, forcing an explicit choice of `Draft` or `Active` before submitting
+    (submit stays disabled until a status is chosen, same style of guard as the requirement
+    combobox). For a test case whose current status is already `Draft`/`Active`, the `Select`
+    behaves normally with that value pre-filled.
+12. **Error feedback — deliberate deviation from the create-flow convention**: the
+    create-flow dialogs (`NewRequirementDialog`/`NewTestCaseDialog`) show failures as inline
+    `text-destructive` text inside the dialog and never toast them. For Edit/Delete, that's
+    replaced: **failures show only as an error toast** (`toast.error(message)`), the same
+    channel as success. No inline error text in `EditTestCaseDialog` or
+    `DeleteTestCaseDialog`. The dialog still stays open with fields/state intact so the user
+    can retry (only the error-display channel changes, not the retry behavior).
 
 ## `EditTestCaseDialog.tsx` (`frontend/src/components/`)
 
@@ -87,8 +125,13 @@ Props: `{ open: boolean; onOpenChange: (v: boolean) => void; projectId: number; 
   `defaultValue={testCase.expected_result}`), `preconditions` (`Textarea`, optional,
   `defaultValue={testCase.preconditions ?? ''}`), `steps` (`Textarea`, optional,
   `defaultValue={testCase.steps ?? ''}`), `priority` (`Select`, `defaultValue={testCase.priority ?? 'Medium'}`).
-- New field vs. Create: `status` (`Select`: Draft/Active/Deprecated,
-  `defaultValue={testCase.status}`).
+- New field vs. Create: `status` (`Select`, options **`Draft`/`Active` only** — no
+  `Deprecated` item, per decision 10). `defaultValue` is `testCase.status` when it's
+  `Draft` or `Active`; when `testCase.status === 'Deprecated'`, no `defaultValue` is passed
+  at all, so the trigger shows its placeholder (`Chọn trạng thái...`) and the user must
+  actively pick `Draft` or `Active` to revive it (decision 11). Track the chosen value in
+  local state (`const [status, setStatus] = useState<TestCaseStatus | undefined>(testCase.status === 'Deprecated' ? undefined : testCase.status)`)
+  so the submit guard can see whether a value has been chosen yet.
 - Requirement: always `RequirementCombobox` (unlocked), initial local state
   `selectedRequirement = testCase.requirement`, mirrored into
   `<input type="hidden" name="requirement_id">`. Submit disabled until a requirement is
@@ -98,7 +141,7 @@ Props: `{ open: boolean; onOpenChange: (v: boolean) => void; projectId: number; 
   "Wiring into pages" below — same split as the create-flow dialogs); on failure →
   `toast.error(message)` fired from inside this dialog itself (it's the one that knows the
   request failed), dialog stays open with the entered values intact so the user can retry.
-- Submit button: `disabled={submitting || !requirement}`, label
+- Submit button: `disabled={submitting || !requirement || !status}`, label
   `submitting ? 'Đang lưu...' : 'Lưu'`.
 
 ## `DeleteTestCaseDialog.tsx` (`frontend/src/components/`)
@@ -163,6 +206,11 @@ Verification for this pass:
   `DELETE /test-cases/{id}` behave as documented above (already-existing endpoints, so
   this is confirmation, not new backend work) — including the 400 path for a bad
   `requirement_id` on edit.
+- For the one actual backend change (`GET /test-cases` default status filtering): a
+  targeted pytest case in `backend/tests/test_test_cases.py` covering (a) a Deprecated
+  test case absent from a no-`status`-param list call, and (b) present when
+  `?status=Deprecated` is passed explicitly. Then a full backend test suite run (`pytest`)
+  to confirm no regression to the existing filter tests.
 - Careful code-path reading for the FormData pre-fill/defaultValue wiring, the hidden-input
   mirroring (combobox → `requirement_id`), the row-splice logic on `TestCasesPage`, and the
   navigate-then-toast sequence on `TestCaseDetailPage`.
