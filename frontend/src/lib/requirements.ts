@@ -73,3 +73,19 @@ export async function createRequirement(payload: {
 }): Promise<Requirement> {
   return authFetch<Requirement>('/requirements', { method: 'POST', body: payload })
 }
+
+export async function updateRequirement(
+  id: number,
+  payload: {
+    title: string
+    description: string
+    status: RequirementStatus
+    change_note?: string
+  },
+): Promise<Requirement> {
+  return authFetch<Requirement>(`/requirements/${id}`, { method: 'PUT', body: payload })
+}
+
+export async function deleteRequirement(id: number): Promise<Requirement> {
+  return authFetch<Requirement>(`/requirements/${id}`, { method: 'DELETE' })
+}
