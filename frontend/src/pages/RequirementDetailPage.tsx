@@ -223,9 +223,6 @@ export function RequirementDetailPage() {
             <Plus className="size-3.5" />
             New Test Case
           </Button>
-          <Button type="button" size="sm" disabled title="Chưa hỗ trợ">
-            Link TC +
-          </Button>
         </div>
       </div>
 
