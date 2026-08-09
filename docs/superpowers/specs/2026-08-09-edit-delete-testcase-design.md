@@ -118,7 +118,16 @@ Recorded so implementation doesn't re-litigate them:
 
 ## `EditTestCaseDialog.tsx` (`frontend/src/components/`)
 
-Props: `{ open: boolean; onOpenChange: (v: boolean) => void; projectId: number; testCase: TestCaseDetail; onUpdated: (tc: TestCase) => void }`.
+Props: `{ open: boolean; onOpenChange: (v: boolean) => void; projectId: number; testCase: TestCaseDetail; onUpdated: (tc: TestCase, requirement: RequirementSummary) => void }`.
+
+**Correction from initial draft**: `onUpdated` must also hand back the selected
+`RequirementSummary`, not just the raw `TestCaseResponse`. `TestCase` (the `PUT` response
+type) has no nested `requirement` field, only `requirement_id` — if the caller merged just
+`{ ...testCase, ...updated }` into `TestCaseDetail` state, a requirement re-link during
+edit would leave the page displaying the **old** `requirement` object (stale). Since
+`EditTestCaseDialog` already holds `selectedRequirement` (the summary matching whatever
+`requirement_id` was submitted) at the moment of success, passing it through the callback
+is free — no extra fetch needed.
 
 - Same `FormData`-on-submit shape as `NewTestCaseDialog`. Fields: `title` (`Input`,
   required, `defaultValue={testCase.title}`), `expected_result` (`Textarea`, required,
@@ -137,7 +146,8 @@ Props: `{ open: boolean; onOpenChange: (v: boolean) => void; projectId: number; 
   `<input type="hidden" name="requirement_id">`. Submit disabled until a requirement is
   selected, same guard as Create.
 - On submit: `updateTestCase(testCase.id, payload)` → same `id` comes back (in-place
-  update) → `onOpenChange(false)`, `onUpdated(tc)` (page fires the success toast, see
+  update) → `onOpenChange(false)`, `onUpdated(tc, selectedRequirement)` (guaranteed
+  non-null at this point by the submit guard; page fires the success toast, see
   "Wiring into pages" below — same split as the create-flow dialogs); on failure →
   `toast.error(message)` fired from inside this dialog itself (it's the one that knows the
   request failed), dialog stays open with the entered values intact so the user can retry.
@@ -161,7 +171,7 @@ Props: `{ open: boolean; onOpenChange: (v: boolean) => void; testCase: { id: num
 
 - **`TestCaseDetailPage.tsx`**: new action row above the title (page currently has none —
   first precedent is `RequirementDetailPage`'s row). `Edit` (`variant="outline" size="sm"`)
-  opens `EditTestCaseDialog`; `onUpdated`: `setTestCase((tc) => tc ? { ...tc, ...updated } : tc)`,
+  opens `EditTestCaseDialog`; `onUpdated`: `setTestCase((tc) => tc ? { ...tc, ...updated, requirement } : tc)`,
   `toast.success('Đã cập nhật test case ' + updated.code + '.')`. `Delete`
   (`variant="destructive" size="sm"`, same sizing as `Edit`) opens `DeleteTestCaseDialog`;
   `onDeleted`: `navigate('/testcases')`,
@@ -179,7 +189,12 @@ Props: `{ open: boolean; onOpenChange: (v: boolean) => void; testCase: { id: num
   `authFetch('/test-cases/${id}', { method: 'PUT', body: payload })`.
 - `deleteTestCase(id: number): Promise<TestCase>` →
   `authFetch('/test-cases/${id}', { method: 'DELETE' })`.
-- `api.ts`'s `RequestOptions.method` already includes `'PUT'`/`'DELETE'` — no change needed.
+- **Correction from initial draft**: `api.ts`'s `RequestOptions.method` type is currently
+  `'GET' | 'POST'` only — no existing frontend code calls `PUT`/`DELETE` anywhere yet
+  (confirmed by grep). It must be widened to
+  `'GET' | 'POST' | 'PUT' | 'DELETE'`. This is a one-line type change in
+  `frontend/src/lib/api.ts`, not new request-handling logic — `apiFetch`/`authFetch`
+  already forward `options.method` verbatim to `fetch()`.
 
 ## Error handling & validation
 
