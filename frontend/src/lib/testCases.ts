@@ -114,3 +114,22 @@ export async function createTestCase(payload: {
 }): Promise<TestCase> {
   return authFetch<TestCase>('/test-cases', { method: 'POST', body: payload })
 }
+
+export async function updateTestCase(
+  id: number,
+  payload: {
+    title: string
+    preconditions?: string
+    steps?: string
+    expected_result: string
+    priority: TestCasePriority
+    status: TestCaseStatus
+    requirement_id: number
+  },
+): Promise<TestCase> {
+  return authFetch<TestCase>(`/test-cases/${id}`, { method: 'PUT', body: payload })
+}
+
+export async function deleteTestCase(id: number): Promise<TestCase> {
+  return authFetch<TestCase>(`/test-cases/${id}`, { method: 'DELETE' })
+}
