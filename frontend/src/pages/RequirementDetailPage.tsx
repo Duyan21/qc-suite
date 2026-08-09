@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -23,14 +23,19 @@ import { getTraceability, type TraceabilityStatus } from '@/lib/traceability'
 import { listDefects } from '@/lib/defects'
 import { listTestCases } from '@/lib/testCases'
 import { NewTestCaseDialog } from '@/components/NewTestCaseDialog'
+import { EditRequirementDialog } from '@/components/EditRequirementDialog'
+import { DeleteRequirementDialog } from '@/components/DeleteRequirementDialog'
 import { useToast } from '@/lib/toast'
 
 type LinkedTestCase = { id: number; code: string; title: string; status: TraceabilityStatus | null }
 
 export function RequirementDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const toast = useToast()
   const [newTcOpen, setNewTcOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [requirement, setRequirement] = useState<Requirement | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -179,8 +184,25 @@ export function RequirementDetailPage() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" disabled title="Chưa hỗ trợ">
-            Edit
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!requirement.is_current}
+            title={requirement.is_current ? undefined : 'Chỉ có thể sửa phiên bản hiện tại'}
+            onClick={() => setEditOpen(true)}
+          >
+            Sửa
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={!requirement.is_current}
+            title={requirement.is_current ? undefined : 'Chỉ có thể xóa phiên bản hiện tại'}
+            onClick={() => setDeleteOpen(true)}
+          >
+            Xóa
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={openHistory}>
             History
@@ -371,6 +393,26 @@ export function RequirementDetailPage() {
             href: `/testcases/${tc.id}`,
             linkLabel: 'Xem test case →',
           })
+        }}
+      />
+
+      <EditRequirementDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        requirement={requirement}
+        onUpdated={(updated) => {
+          toast.success(`Đã cập nhật requirement ${updated.req_id}.`)
+          navigate(`/requirements/${updated.id}`, { replace: true })
+        }}
+      />
+
+      <DeleteRequirementDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        requirement={{ id: requirement.id, req_id: requirement.req_id }}
+        onDeleted={(updated) => {
+          toast.success(`Đã xóa requirement ${updated.req_id}.`)
+          navigate('/requirements')
         }}
       />
     </div>
