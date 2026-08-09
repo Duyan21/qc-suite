@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +24,7 @@ import {
 } from '@/lib/requirements'
 import { getTraceability, type TraceabilityResponse } from '@/lib/traceability'
 import { NewRequirementDialog } from '@/components/NewRequirementDialog'
+import { DeleteRequirementDialog } from '@/components/DeleteRequirementDialog'
 import { useToast } from '@/lib/toast'
 
 const PAGE_SIZE = 20
@@ -42,6 +43,7 @@ export function RequirementsPage() {
   const { project } = useCurrentProject()
   const toast = useToast()
   const [newOpen, setNewOpen] = useState(false)
+  const [deletingRequirement, setDeletingRequirement] = useState<{ id: number; req_id: string } | null>(null)
   const [data, setData] = useState<RequirementListResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -193,7 +195,8 @@ export function RequirementsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Version</TableHead>
                 <TableHead>Linked TC</TableHead>
-                <TableHead className="pr-4">Updated</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="w-8 pr-4" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -210,7 +213,20 @@ export function RequirementsPage() {
                   </TableCell>
                   <TableCell>v{req.version}</TableCell>
                   <TableCell>{tcCountByReqId.get(req.req_id) ?? '—'}</TableCell>
-                  <TableCell className="pr-4 text-muted-foreground">{formatDate(req.created_at)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(req.created_at)}</TableCell>
+                  <TableCell className="pr-4">
+                    {req.status !== 'Deprecated' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Xóa"
+                        onClick={() => setDeletingRequirement({ id: req.id, req_id: req.req_id })}
+                      >
+                        <Trash2 />
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -258,6 +274,27 @@ export function RequirementsPage() {
           }}
         />
       )}
+
+      <DeleteRequirementDialog
+        open={deletingRequirement !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletingRequirement(null)
+        }}
+        requirement={deletingRequirement}
+        onDeleted={(updated) => {
+          setData((d) =>
+            d
+              ? {
+                  ...d,
+                  items: d.items.filter((r) => r.id !== updated.id),
+                  total: d.total - 1,
+                }
+              : d,
+          )
+          toast.success(`Đã xóa requirement ${updated.req_id}.`)
+          setDeletingRequirement(null)
+        }}
+      />
     </div>
   )
 }
