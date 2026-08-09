@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { listTestCases, type TestCaseSummary } from '@/lib/testCases'
+import { listTestCases } from '@/lib/testCases'
+import type { TestCaseSummary } from '@/lib/testCases'
 
 type TestCaseComboboxProps = {
   projectId: number
@@ -34,7 +35,9 @@ export function TestCaseCombobox({ projectId, value, onChange }: TestCaseCombobo
     listTestCases({ project_id: projectId, search: debouncedSearch || undefined, limit: 20 })
       .then((result) => {
         if (requestIdRef.current !== requestId) return
-        setResults(result.items as TestCaseSummary[])
+        setResults(
+          result.items.map((tc) => ({ id: tc.id, code: tc.code, title: tc.title, status: tc.status })),
+        )
       })
       .catch(() => {
         if (requestIdRef.current !== requestId) return
