@@ -57,3 +57,9 @@ class DefectListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class DefectStatsResponse(BaseModel):
+    total: int
+    by_status: dict[str, int]
+    by_severity: dict[str, int]

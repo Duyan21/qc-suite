@@ -306,3 +306,48 @@ def test_update_defect_changes_severity_status_fixed_in_version(client, auth_hea
 def test_defects_require_auth(client):
     response = client.get("/defects")
     assert response.status_code == 401
+
+
+def test_defect_stats_counts_by_status_and_severity_scoped_by_project(client, auth_headers, db_session, project):
+    other_project = Project(name="Other Project", description="d")
+    db_session.add(other_project)
+    db_session.commit()
+    db_session.refresh(other_project)
+
+    client.post(
+        "/defects",
+        json={"title": "A", "severity": "Critical", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    )
+    client.post(
+        "/defects",
+        json={"title": "B", "severity": "Critical", "status": "Fixed", "project_id": project.id},
+        headers=auth_headers,
+    )
+    client.post(
+        "/defects",
+        json={"title": "C", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    )
+    client.post(
+        "/defects",
+        json={"title": "Other project's bug", "severity": "Critical", "status": "Open", "project_id": other_project.id},
+        headers=auth_headers,
+    )
+
+    response = client.get(f"/defects/stats?project_id={project.id}", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 3
+    assert data["by_status"] == {"Open": 2, "Fixed": 1, "Closed": 0, "Wont-Fix": 0}
+    assert data["by_severity"] == {"Critical": 2, "High": 0, "Medium": 0, "Low": 1}
+
+
+def test_defect_stats_rejects_unknown_project(client, auth_headers):
+    response = client.get("/defects/stats?project_id=999999", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_defect_stats_requires_project_id(client, auth_headers):
+    response = client.get("/defects/stats", headers=auth_headers)
+    assert response.status_code == 422

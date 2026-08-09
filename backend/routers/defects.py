@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from models.all_models import Defect, Project, Requirement, TestCase
@@ -11,6 +11,7 @@ from schemas.defects import (
     DefectListItem,
     DefectListResponse,
     DefectResponse,
+    DefectStatsResponse,
     DefectUpdate,
 )
 from services.auth_service import get_current_user
@@ -102,6 +103,32 @@ def create_defect(payload: DefectCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(defect)
     return defect
+
+
+@router.get("/stats", response_model=DefectStatsResponse)
+def get_defect_stats(project_id: int, db: Session = Depends(get_db)):
+    if db.get(Project, project_id) is None:
+        raise HTTPException(status_code=404, detail="project_id not found")
+
+    total = db.query(Defect).filter(Defect.project_id == project_id).count()
+
+    status_counts = dict(
+        db.query(Defect.status, func.count(Defect.id))
+        .filter(Defect.project_id == project_id)
+        .group_by(Defect.status)
+        .all()
+    )
+    severity_counts = dict(
+        db.query(Defect.severity, func.count(Defect.id))
+        .filter(Defect.project_id == project_id)
+        .group_by(Defect.severity)
+        .all()
+    )
+
+    by_status = {s: status_counts.get(s, 0) for s in ("Open", "Fixed", "Closed", "Wont-Fix")}
+    by_severity = {s: severity_counts.get(s, 0) for s in ("Critical", "High", "Medium", "Low")}
+
+    return DefectStatsResponse(total=total, by_status=by_status, by_severity=by_severity)
 
 
 @router.get("/{id}", response_model=DefectDetailResponse)
