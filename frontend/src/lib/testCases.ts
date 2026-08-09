@@ -6,6 +6,13 @@ export { REQUIREMENT_STATUS_BADGE_CLASS as TC_STATUS_BADGE_CLASS } from './requi
 export type TestCaseStatus = 'Draft' | 'Active' | 'Deprecated'
 export type TestCasePriority = 'High' | 'Medium' | 'Low'
 
+export type TestCaseSummary = {
+  id: number
+  code: string
+  title: string
+  status: string
+}
+
 export type TestCaseListItem = {
   id: number
   code: string
