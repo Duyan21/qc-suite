@@ -43,7 +43,10 @@ def get_traceability(project_id: int = Query(...), db: Session = Depends(get_db)
 
     test_cases = (
         db.query(TestCase)
-        .filter(TestCase.requirement_id.in_(requirement_ids))
+        .filter(
+            TestCase.requirement_id.in_(requirement_ids),
+            TestCase.status != "Deprecated",
+        )
         .order_by(TestCase.id)
         .all()
         if requirement_ids

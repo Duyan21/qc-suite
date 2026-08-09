@@ -230,15 +230,17 @@ export function TestCasesPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(tc.updated_at)}</TableCell>
                   <TableCell className="pr-4">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      title="Xóa"
-                      onClick={() => setDeletingTestCase({ id: tc.id, code: tc.code })}
-                    >
-                      <Trash2 />
-                    </Button>
+                    {tc.status !== 'Deprecated' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Xóa"
+                        onClick={() => setDeletingTestCase({ id: tc.id, code: tc.code })}
+                      >
+                        <Trash2 />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

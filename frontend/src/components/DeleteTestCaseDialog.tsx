@@ -51,7 +51,7 @@ export function DeleteTestCaseDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
           <Button
