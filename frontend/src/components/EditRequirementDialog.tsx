@@ -69,7 +69,10 @@ export function EditRequirementDialog({
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Sửa Requirement</DialogTitle>
-            <DialogDescription>Cập nhật thông tin requirement {requirement.req_id}.</DialogDescription>
+            <DialogDescription>
+              Cập nhật thông tin requirement {requirement.req_id}. Lưu sẽ tạo phiên bản mới; các test
+              case đã liên kết vẫn giữ nguyên ở phiên bản cũ.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">

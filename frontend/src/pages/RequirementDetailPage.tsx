@@ -198,8 +198,14 @@ export function RequirementDetailPage() {
             type="button"
             variant="destructive"
             size="sm"
-            disabled={!requirement.is_current}
-            title={requirement.is_current ? undefined : 'Chỉ có thể xóa phiên bản hiện tại'}
+            disabled={!requirement.is_current || requirement.status === 'Deprecated'}
+            title={
+              !requirement.is_current
+                ? 'Chỉ có thể xóa phiên bản hiện tại'
+                : requirement.status === 'Deprecated'
+                  ? 'Requirement này đã bị xóa'
+                  : undefined
+            }
             onClick={() => setDeleteOpen(true)}
           >
             Xóa

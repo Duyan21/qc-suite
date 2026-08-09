@@ -110,11 +110,13 @@ def test_update_requirement_creates_new_version_and_history_has_three(client, au
     assert v2["is_current"] is True
     assert v2["previous_version_id"] == v1["id"]
     assert v2["req_id"] == v1["req_id"]
+    assert v2["id"] != v1["id"]
 
     update_body_2 = {**update_body, "title": "User can log in (v3)", "change_note": "Fix wording"}
     v3_response = client.put(f"/requirements/{v2['id']}", json=update_body_2, headers=auth_headers)
     v3 = v3_response.json()
     assert v3["version"] == 3
+    assert v3["id"] != v2["id"]
 
     history_response = client.get(f"/requirements/{v1['req_id']}/history", headers=auth_headers)
     assert history_response.status_code == 200
@@ -175,6 +177,7 @@ def test_delete_requirement_creates_deprecated_version(client, auth_headers, pro
     assert deleted["version"] == 2
     assert deleted["is_current"] is True
     assert deleted["previous_version_id"] == v1["id"]
+    assert deleted["id"] != v1["id"]
     assert deleted["req_id"] == v1["req_id"]
     assert deleted["title"] == v1["title"]
     assert deleted["description"] == v1["description"]

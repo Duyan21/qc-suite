@@ -151,7 +151,7 @@ Props: `{ open: boolean; onOpenChange: (v: boolean) => void; requirement: { id: 
   `lucide-react`, `variant="ghost" size="icon-sm"`, `title="Xóa"`) per row. One
   `DeleteRequirementDialog` instance keyed off `deletingRequirement: { id, req_id } | null`
   state (set by the row button's `onClick`), not one dialog per row. `onDeleted(updated)`:
-  `setData((d) => d ? { ...d, items: d.items.filter((r) => r.id !== updated.id), total: d.total - 1 } : d)`
+  `setData((d) => d ? { ...d, items: d.items.filter((r) => r.id !== updated.previous_version_id), total: d.total - 1 } : d)`
   — no refetch, `toast.success('Đã xóa requirement ' + updated.req_id + '.')`.
 
 ## `lib/requirements.ts` additions

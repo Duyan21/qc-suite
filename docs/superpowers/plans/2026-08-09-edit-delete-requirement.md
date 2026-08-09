@@ -847,7 +847,7 @@ Right after the existing `<NewRequirementDialog ... />` block, add:
             d
               ? {
                   ...d,
-                  items: d.items.filter((r) => r.id !== updated.id),
+                  items: d.items.filter((r) => r.id !== updated.previous_version_id),
                   total: d.total - 1,
                 }
               : d,
