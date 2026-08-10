@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from models.all_models import Project, Requirement, User
@@ -39,7 +40,12 @@ def list_requirements(
     else:
         query = query.filter(Requirement.status != "Deprecated")
     if search is not None:
-        query = query.filter(Requirement.title.ilike(f"%{search}%"))
+        query = query.filter(
+            or_(
+                Requirement.title.ilike(f"%{search}%"),
+                Requirement.req_id.ilike(f"%{search}%"),
+            )
+        )
 
     total = query.count()
     items = (
