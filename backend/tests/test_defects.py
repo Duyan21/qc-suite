@@ -303,6 +303,36 @@ def test_update_defect_changes_severity_status_fixed_in_version(client, auth_hea
     assert data["fixed_in_version"] == "v2.1.0"
 
 
+def test_delete_defect_removes_it(client, auth_headers, project):
+    created = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    ).json()
+
+    response = client.delete(f"/defects/{created['id']}", headers=auth_headers)
+    assert response.status_code == 204
+
+    get_response = client.get(f"/defects/{created['id']}", headers=auth_headers)
+    assert get_response.status_code == 404
+
+
+def test_delete_defect_missing_returns_404(client, auth_headers):
+    response = client.delete("/defects/999999", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_delete_defect_requires_auth(client, auth_headers, project):
+    created = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    ).json()
+
+    response = client.delete(f"/defects/{created['id']}")
+    assert response.status_code == 401
+
+
 def test_defects_require_auth(client):
     response = client.get("/defects")
     assert response.status_code == 401

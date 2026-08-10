@@ -160,3 +160,13 @@ def update_defect(id: int, payload: DefectUpdate, db: Session = Depends(get_db))
     db.commit()
     db.refresh(defect)
     return defect
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_defect(id: int, db: Session = Depends(get_db)):
+    defect = db.get(Defect, id)
+    if defect is None:
+        raise HTTPException(status_code=404, detail="Defect not found")
+
+    db.delete(defect)
+    db.commit()
