@@ -1,28 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
-import { Card, CardHeader } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { useCurrentProject } from '@/lib/currentProject'
 import { formatDate } from '@/lib/utils'
 import {
   listDefects,
-  getDefectStats,
   DEFECT_SEVERITY_BADGE_CLASS,
   DEFECT_STATUS_BADGE_CLASS,
   type DefectListItem,
-  type DefectListResponse,
-  type DefectStats,
   type DefectSeverity,
   type DefectStatus,
 } from '@/lib/defects'
@@ -30,6 +19,7 @@ import { NewDefectDialog } from '@/components/NewDefectDialog'
 import { useToast } from '@/lib/toast'
 
 const PAGE_SIZE = 20
+const FETCH_LIMIT = 200
 const SEVERITY_OPTIONS: DefectSeverity[] = ['Critical', 'High', 'Medium', 'Low']
 const STATUS_OPTIONS: DefectStatus[] = ['Open', 'Fixed', 'Closed', 'Wont-Fix']
 
@@ -79,57 +69,37 @@ export function DefectsPage() {
   const { project } = useCurrentProject()
   const toast = useToast()
   const [newOpen, setNewOpen] = useState(false)
-  const [data, setData] = useState<DefectListResponse | null>(null)
-  const [stats, setStats] = useState<DefectStats | null>(null)
+  const [allDefects, setAllDefects] = useState<DefectListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const [severityFilter, setSeverityFilter] = useState<DefectSeverity | 'all'>('all')
-  const [statusFilter, setStatusFilter] = useState<DefectStatus | 'all'>('all')
+  const [selectedSeverities, setSelectedSeverities] = useState<Set<DefectSeverity>>(new Set())
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<DefectStatus>>(new Set())
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
   const requestIdRef = useRef(0)
-  const statsRequestIdRef = useRef(0)
 
   useEffect(() => {
     setPage(1)
-  }, [project?.id, severityFilter, statusFilter, debouncedSearch])
+  }, [project?.id, debouncedSearch, selectedSeverities, selectedStatuses])
 
   useEffect(() => {
     if (!project) {
-      setData(null)
+      setAllDefects([])
       return
     }
-    load(project.id, page, severityFilter, statusFilter, debouncedSearch)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.id, page, severityFilter, statusFilter, debouncedSearch])
-
-  useEffect(() => {
-    loadStats()
+    load(project.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id])
 
-  function load(
-    projectId: number,
-    page: number,
-    severityFilter: DefectSeverity | 'all',
-    statusFilter: DefectStatus | 'all',
-    search: string,
-  ) {
+  function load(projectId: number) {
     const requestId = ++requestIdRef.current
     setLoading(true)
     setError(null)
-    listDefects({
-      project_id: projectId,
-      page,
-      limit: PAGE_SIZE,
-      severity: severityFilter === 'all' ? undefined : severityFilter,
-      status: statusFilter === 'all' ? undefined : statusFilter,
-      search: search || undefined,
-    })
+    listDefects({ project_id: projectId, limit: FETCH_LIMIT })
       .then((result) => {
         if (requestIdRef.current !== requestId) return
-        setData(result)
+        setAllDefects(result.items)
       })
       .catch((err) => {
         if (requestIdRef.current !== requestId) return
@@ -141,24 +111,32 @@ export function DefectsPage() {
       })
   }
 
-  function loadStats() {
-    if (!project) {
-      setStats(null)
-      return
-    }
-    const requestId = ++statsRequestIdRef.current
-    getDefectStats(project.id)
-      .then((result) => {
-        if (statsRequestIdRef.current !== requestId) return
-        setStats(result)
-      })
-      .catch(() => {
-        if (statsRequestIdRef.current !== requestId) return
-        setStats(null)
-      })
-  }
+  const filteredSorted = useMemo(() => {
+    return allDefects
+      .filter((d) =>
+        matchesDefectFilters(d, {
+          search: debouncedSearch,
+          severities: selectedSeverities,
+          statuses: selectedStatuses,
+        }),
+      )
+      .sort(compareDefects)
+  }, [allDefects, debouncedSearch, selectedSeverities, selectedStatuses])
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
+  const totalPages = Math.max(1, Math.ceil(filteredSorted.length / PAGE_SIZE))
+  const pageItems = filteredSorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<DefectStatus, number> = { Open: 0, Fixed: 0, Closed: 0, 'Wont-Fix': 0 }
+    for (const d of allDefects) {
+      if (d.status in counts) counts[d.status as DefectStatus]++
+    }
+    return counts
+  }, [allDefects])
+
+  const openCount = statusCounts.Open
+  const criticalCount = allDefects.filter((d) => d.severity === 'Critical').length
+  const activeFilterCount = selectedSeverities.size + selectedStatuses.size
 
   return (
     <div className="flex flex-col gap-4">
