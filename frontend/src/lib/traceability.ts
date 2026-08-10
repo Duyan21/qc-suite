@@ -1,12 +1,14 @@
 import { authFetch } from './api'
 
-export type TraceabilityStatus = 'covered' | 'failed' | 'partial'
+export type TraceabilityStatus = 'covered' | 'failed' | 'skipped' | 'not_run'
 
 export type TraceabilityTestCaseItem = {
   id: number
   code: string
   title: string
   status: TraceabilityStatus
+  run_id: number | null
+  executed_at: string | null
 }
 
 export type TraceabilityRequirementItem = {
