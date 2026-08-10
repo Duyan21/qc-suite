@@ -178,46 +178,83 @@ export function DefectsPage() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-col gap-3 px-4 pt-4">
           <Input
-            placeholder="Tìm defect..."
+            placeholder="Tìm theo ID, tiêu đề, test case..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="sm:max-w-xs"
+            className="sm:max-w-sm"
           />
-          <Select
-            value={severityFilter}
-            onValueChange={(value) => setSeverityFilter(value as DefectSeverity | 'all')}
-          >
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="Severity: All" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Severity: All</SelectItem>
-              {SEVERITY_OPTIONS.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={statusFilter}
-            onValueChange={(value) => setStatusFilter(value as DefectStatus | 'all')}
-          >
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="Status: All" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Status: All</SelectItem>
-              {STATUS_OPTIONS.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardHeader>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={selectedStatuses.size === 0 ? 'default' : 'outline'}
+              onClick={() => setSelectedStatuses(new Set())}
+            >
+              All {allDefects.length}
+            </Button>
+            {STATUS_OPTIONS.map((s) => (
+              <Button
+                key={s}
+                type="button"
+                size="sm"
+                variant={selectedStatuses.has(s) ? 'default' : 'outline'}
+                onClick={() =>
+                  setSelectedStatuses((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(s)) next.delete(s)
+                    else next.add(s)
+                    return next
+                  })
+                }
+              >
+                {s} {statusCounts[s]}
+              </Button>
+            ))}
+            {activeFilterCount > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="link"
+                className="ml-auto"
+                onClick={() => {
+                  setSelectedStatuses(new Set())
+                  setSelectedSeverities(new Set())
+                }}
+              >
+                Xóa bộ lọc ({activeFilterCount})
+              </Button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase text-muted-foreground">Severity</span>
+            {SEVERITY_OPTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() =>
+                  setSelectedSeverities((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(s)) next.delete(s)
+                    else next.add(s)
+                    return next
+                  })
+                }
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                  selectedSeverities.has(s)
+                    ? DEFECT_SEVERITY_BADGE_CLASS[s]
+                    : 'border-input text-muted-foreground'
+                }`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {!project && (
           <p className="px-4 text-sm text-muted-foreground">Vui lòng chọn một dự án.</p>
