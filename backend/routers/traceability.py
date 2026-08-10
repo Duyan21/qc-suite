@@ -25,11 +25,17 @@ def _status_for_result(result: str | None) -> str:
         return "covered"
     if result == "Fail":
         return "failed"
-    return "partial"
+    if result is None:
+        return "not_run"
+    return "skipped"
 
 
 @router.get("", response_model=TraceabilityResponse)
-def get_traceability(project_id: int = Query(...), db: Session = Depends(get_db)):
+def get_traceability(
+    project_id: int = Query(...),
+    release_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+):
     if db.get(Project, project_id) is None:
         raise HTTPException(status_code=404, detail="project_id not found")
 
@@ -54,12 +60,14 @@ def get_traceability(project_id: int = Query(...), db: Session = Depends(get_db)
     )
     test_case_ids = [tc.id for tc in test_cases]
 
-    latest_result_by_tc: dict[int, str | None] = {}
+    latest_by_tc: dict[int, tuple[str | None, int, object]] = {}
     if test_case_ids:
-        ranked = (
+        result_query = (
             db.query(
                 TestRunResult.testcase_id.label("testcase_id"),
                 TestRunResult.result.label("result"),
+                TestRun.id.label("run_id"),
+                TestRun.executed_at.label("executed_at"),
                 func.row_number()
                 .over(
                     partition_by=TestRunResult.testcase_id,
@@ -73,12 +81,18 @@ def get_traceability(project_id: int = Query(...), db: Session = Depends(get_db)
             )
             .join(TestRun, TestRunResult.run_id == TestRun.id)
             .filter(TestRunResult.testcase_id.in_(test_case_ids))
-            .subquery()
         )
+        if release_id is not None:
+            result_query = result_query.filter(TestRun.release_id == release_id)
+        ranked = result_query.subquery()
         latest_rows = (
-            db.query(ranked.c.testcase_id, ranked.c.result).filter(ranked.c.rn == 1).all()
+            db.query(ranked.c.testcase_id, ranked.c.result, ranked.c.run_id, ranked.c.executed_at)
+            .filter(ranked.c.rn == 1)
+            .all()
         )
-        latest_result_by_tc = {row.testcase_id: row.result for row in latest_rows}
+        latest_by_tc = {
+            row.testcase_id: (row.result, row.run_id, row.executed_at) for row in latest_rows
+        }
 
     tc_by_requirement: dict[int, list[TestCase]] = defaultdict(list)
     for tc in test_cases:
@@ -87,15 +101,19 @@ def get_traceability(project_id: int = Query(...), db: Session = Depends(get_db)
     items = []
     for req in requirements:
         linked = tc_by_requirement.get(req.id, [])
-        tc_items = [
-            TraceabilityTestCaseItem(
-                id=tc.id,
-                code=tc.code,
-                title=tc.title,
-                status=_status_for_result(latest_result_by_tc.get(tc.id)),
+        tc_items = []
+        for tc in linked:
+            result, run_id, executed_at = latest_by_tc.get(tc.id, (None, None, None))
+            tc_items.append(
+                TraceabilityTestCaseItem(
+                    id=tc.id,
+                    code=tc.code,
+                    title=tc.title,
+                    status=_status_for_result(result),
+                    run_id=run_id,
+                    executed_at=executed_at,
+                )
             )
-            for tc in linked
-        ]
         covered_count = sum(1 for item in tc_items if item.status == "covered")
         total = len(tc_items)
         items.append(

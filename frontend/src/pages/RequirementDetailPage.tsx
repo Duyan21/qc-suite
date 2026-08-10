@@ -292,7 +292,9 @@ export function RequirementDetailPage() {
                               Fail
                             </Badge>
                           )}
-                          {tc.status === 'partial' && <Badge variant="outline">Chưa chạy</Badge>}
+                          {(tc.status === 'skipped' || tc.status === 'not_run') && (
+                            <Badge variant="outline">Chưa chạy</Badge>
+                          )}
                           {tc.status === null && <Badge variant="outline">—</Badge>}
                         </TableCell>
                       </TableRow>

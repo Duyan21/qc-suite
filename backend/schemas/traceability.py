@@ -1,8 +1,9 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
 
-TraceabilityStatus = Literal["covered", "failed", "partial"]
+TraceabilityStatus = Literal["covered", "failed", "skipped", "not_run"]
 
 
 class TraceabilityTestCaseItem(BaseModel):
@@ -10,6 +11,8 @@ class TraceabilityTestCaseItem(BaseModel):
     code: str
     title: str
     status: TraceabilityStatus
+    run_id: int | None = None
+    executed_at: datetime | None = None
 
 
 class TraceabilityRequirementItem(BaseModel):

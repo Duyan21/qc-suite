@@ -100,8 +100,49 @@ def test_traceability_status_mapping_and_coverage_percent(client, auth_headers, 
     statuses = {tc["code"]: tc["status"] for tc in item["test_cases"]}
     assert statuses[tc_pass.code] == "covered"
     assert statuses[tc_fail.code] == "failed"
-    assert statuses[tc_skip.code] == "partial"
-    assert statuses[tc_never_run.code] == "partial"
+    assert statuses[tc_skip.code] == "skipped"
+    assert statuses[tc_never_run.code] == "not_run"
+
+
+def test_traceability_returns_run_id_and_executed_at(client, auth_headers, project, db_session):
+    req = _create_requirement(db_session, project.id)
+    tc = _create_test_case(db_session, req.id)
+    release = Release(project_id=project.id, version_name="v1.0.0")
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    result_row = _create_run_result(db_session, release.id, tc.id, "Pass")
+
+    response = client.get(f"/traceability?project_id={project.id}", headers=auth_headers)
+    item = response.json()["items"][0]["test_cases"][0]
+    assert item["run_id"] == result_row.run_id
+    assert item["executed_at"] is not None
+
+
+def test_traceability_scopes_status_by_release_id(client, auth_headers, project, db_session):
+    req = _create_requirement(db_session, project.id)
+    tc = _create_test_case(db_session, req.id)
+
+    release_a = Release(project_id=project.id, version_name="v1.0.0")
+    release_b = Release(project_id=project.id, version_name="v2.0.0")
+    db_session.add_all([release_a, release_b])
+    db_session.commit()
+    db_session.refresh(release_a)
+    db_session.refresh(release_b)
+
+    _create_run_result(db_session, release_a.id, tc.id, "Fail")
+    _create_run_result(db_session, release_b.id, tc.id, "Pass")
+
+    # Unscoped: the most recent run overall (release_b) wins.
+    response = client.get(f"/traceability?project_id={project.id}", headers=auth_headers)
+    assert response.json()["items"][0]["test_cases"][0]["status"] == "covered"
+
+    # Scoped to release_a: only that release's run is considered.
+    response = client.get(
+        f"/traceability?project_id={project.id}&release_id={release_a.id}", headers=auth_headers
+    )
+    assert response.json()["items"][0]["test_cases"][0]["status"] == "failed"
 
 
 def test_traceability_latest_run_wins(client, auth_headers, project, db_session):
