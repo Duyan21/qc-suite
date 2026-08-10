@@ -171,13 +171,13 @@ export function DefectsPage() {
               placeholder="Tìm theo ID, tiêu đề, test case..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="sm:max-w-sm"
+              className="sm:max-w-sm md:text-base"
             />
             <div className="inline-flex items-center rounded-full border border-input p-1">
               <button
                 type="button"
                 onClick={() => setSelectedStatus('all')}
-                className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium ${
+                className={`cursor-pointer rounded-full px-3 py-1 text-base font-medium ${
                   selectedStatus === 'all'
                     ? 'bg-foreground text-background'
                     : 'text-muted-foreground hover:text-foreground'
@@ -190,7 +190,7 @@ export function DefectsPage() {
                   key={s}
                   type="button"
                   onClick={() => setSelectedStatus(s)}
-                  className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium ${
+                  className={`cursor-pointer rounded-full px-3 py-1 text-base font-medium ${
                     selectedStatus === s
                       ? 'bg-foreground text-background'
                       : 'text-muted-foreground hover:text-foreground'
@@ -205,6 +205,7 @@ export function DefectsPage() {
                 type="button"
                 size="sm"
                 variant="link"
+                className="text-base"
                 onClick={() => {
                   setSelectedStatus('all')
                   setSelectedSeverities(new Set())
@@ -219,7 +220,7 @@ export function DefectsPage() {
           <div className="border-t" />
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1 text-xs font-medium uppercase text-muted-foreground">
+            <span className="flex items-center gap-1 text-base font-medium uppercase text-muted-foreground">
               <SlidersHorizontal className="size-3.5" />
               Severity
             </span>
@@ -235,7 +236,7 @@ export function DefectsPage() {
                     return next
                   })
                 }
-                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-base font-medium ${
                   selectedSeverities.has(s)
                     ? DEFECT_SEVERITY_BADGE_CLASS[s]
                     : 'border-input text-muted-foreground'
