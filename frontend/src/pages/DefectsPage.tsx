@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -30,11 +30,18 @@ const SEVERITY_RANK: Record<DefectSeverity, number> = {
   Low: 0,
 }
 
+const SEVERITY_DOT_CLASS: Record<DefectSeverity, string> = {
+  Critical: 'bg-red-500',
+  High: 'bg-amber-500',
+  Medium: 'bg-amber-500',
+  Low: 'bg-muted-foreground',
+}
+
 function matchesDefectFilters(
   d: DefectListItem,
-  opts: { search: string; severities: Set<DefectSeverity>; statuses: Set<DefectStatus> },
+  opts: { search: string; severities: Set<DefectSeverity>; status: DefectStatus | 'all' },
 ): boolean {
-  const { search, severities, statuses } = opts
+  const { search, severities, status } = opts
   if (search) {
     const q = search.toLowerCase()
     const haystack = `${d.code} ${d.title}`.toLowerCase()
@@ -43,9 +50,7 @@ function matchesDefectFilters(
   if (severities.size > 0) {
     if (!d.severity || !severities.has(d.severity as DefectSeverity)) return false
   }
-  if (statuses.size > 0) {
-    if (!statuses.has(d.status as DefectStatus)) return false
-  }
+  if (status !== 'all' && d.status !== status) return false
   return true
 }
 
@@ -68,20 +73,21 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 export function DefectsPage() {
   const { project } = useCurrentProject()
   const toast = useToast()
+  const navigate = useNavigate()
   const [newOpen, setNewOpen] = useState(false)
   const [allDefects, setAllDefects] = useState<DefectListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [selectedSeverities, setSelectedSeverities] = useState<Set<DefectSeverity>>(new Set())
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<DefectStatus>>(new Set())
+  const [selectedStatus, setSelectedStatus] = useState<DefectStatus | 'all'>('all')
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
   const requestIdRef = useRef(0)
 
   useEffect(() => {
     setPage(1)
-  }, [project?.id, debouncedSearch, selectedSeverities, selectedStatuses])
+  }, [project?.id, debouncedSearch, selectedSeverities, selectedStatus])
 
   useEffect(() => {
     if (!project) {
@@ -117,11 +123,11 @@ export function DefectsPage() {
         matchesDefectFilters(d, {
           search: debouncedSearch,
           severities: selectedSeverities,
-          statuses: selectedStatuses,
+          status: selectedStatus,
         }),
       )
       .sort(compareDefects)
-  }, [allDefects, debouncedSearch, selectedSeverities, selectedStatuses])
+  }, [allDefects, debouncedSearch, selectedSeverities, selectedStatus])
 
   const totalPages = Math.max(1, Math.ceil(filteredSorted.length / PAGE_SIZE))
   const pageItems = filteredSorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -136,7 +142,7 @@ export function DefectsPage() {
 
   const openCount = statusCounts.Open
   const criticalCount = allDefects.filter((d) => d.severity === 'Critical').length
-  const activeFilterCount = selectedSeverities.size + selectedStatuses.size
+  const activeFilterCount = selectedSeverities.size + (selectedStatus === 'all' ? 0 : 1)
 
   return (
     <div className="flex flex-col gap-4">
@@ -160,39 +166,37 @@ export function DefectsPage() {
 
       <Card>
         <div className="flex flex-col gap-3 px-4 pt-4">
-          <Input
-            placeholder="Tìm theo ID, tiêu đề, test case..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="sm:max-w-sm"
-          />
-
           <div className="flex flex-wrap items-center gap-2">
-            <Button
+            <Input
+              placeholder="Tìm theo ID, tiêu đề, test case..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="sm:max-w-sm"
+            />
+            <button
               type="button"
-              size="sm"
-              variant={selectedStatuses.size === 0 ? 'default' : 'outline'}
-              onClick={() => setSelectedStatuses(new Set())}
+              onClick={() => setSelectedStatus('all')}
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                selectedStatus === 'all'
+                  ? 'border-foreground bg-foreground text-background'
+                  : 'border-input text-muted-foreground'
+              }`}
             >
               All {allDefects.length}
-            </Button>
+            </button>
             {STATUS_OPTIONS.map((s) => (
-              <Button
+              <button
                 key={s}
                 type="button"
-                size="sm"
-                variant={selectedStatuses.has(s) ? 'default' : 'outline'}
-                onClick={() =>
-                  setSelectedStatuses((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(s)) next.delete(s)
-                    else next.add(s)
-                    return next
-                  })
-                }
+                onClick={() => setSelectedStatus(s)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                  selectedStatus === s
+                    ? 'border-foreground bg-foreground text-background'
+                    : 'border-input text-muted-foreground'
+                }`}
               >
                 {s} {statusCounts[s]}
-              </Button>
+              </button>
             ))}
             {activeFilterCount > 0 && (
               <Button
@@ -201,7 +205,7 @@ export function DefectsPage() {
                 variant="link"
                 className="ml-auto"
                 onClick={() => {
-                  setSelectedStatuses(new Set())
+                  setSelectedStatus('all')
                   setSelectedSeverities(new Set())
                 }}
               >
@@ -230,7 +234,7 @@ export function DefectsPage() {
                     : 'border-input text-muted-foreground'
                 }`}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                <span className={`h-1.5 w-1.5 rounded-full ${SEVERITY_DOT_CLASS[s]}`} />
                 {s}
               </button>
             ))}
@@ -265,7 +269,16 @@ export function DefectsPage() {
             {pageItems.map((d: DefectListItem) => (
               <Card
                 key={d.id}
-                className={`flex-row gap-3 border-l-4 p-4 ${
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/defects/${d.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    navigate(`/defects/${d.id}`)
+                  }
+                }}
+                className={`flex-row gap-3 border-l-4 p-4 cursor-pointer transition-colors hover:bg-muted/50 ${
                   d.severity === 'Critical'
                     ? 'border-l-red-500'
                     : d.severity === 'High' || d.severity === 'Medium'
@@ -275,7 +288,11 @@ export function DefectsPage() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Link to={`/defects/${d.id}`} className="text-primary underline-offset-4 hover:underline">
+                    <Link
+                      to={`/defects/${d.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
                       {d.code}
                     </Link>
                     <Badge className={DEFECT_SEVERITY_BADGE_CLASS[d.severity ?? ''] ?? ''}>
@@ -294,6 +311,7 @@ export function DefectsPage() {
                     {d.test_case ? (
                       <Link
                         to={`/testcases/${d.test_case.id}`}
+                        onClick={(e) => e.stopPropagation()}
                         className="text-primary underline-offset-4 hover:underline"
                       >
                         {d.test_case.code}
