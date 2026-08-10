@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, SlidersHorizontal, X } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -177,7 +177,7 @@ export function DefectsPage() {
               <button
                 type="button"
                 onClick={() => setSelectedStatus('all')}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium ${
                   selectedStatus === 'all'
                     ? 'bg-foreground text-background'
                     : 'text-muted-foreground hover:text-foreground'
@@ -190,7 +190,7 @@ export function DefectsPage() {
                   key={s}
                   type="button"
                   onClick={() => setSelectedStatus(s)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium ${
                     selectedStatus === s
                       ? 'bg-foreground text-background'
                       : 'text-muted-foreground hover:text-foreground'
@@ -205,19 +205,24 @@ export function DefectsPage() {
                 type="button"
                 size="sm"
                 variant="link"
-                className="ml-auto"
                 onClick={() => {
                   setSelectedStatus('all')
                   setSelectedSeverities(new Set())
                 }}
               >
+                <X className="size-3.5" />
                 Xóa bộ lọc ({activeFilterCount})
               </Button>
             )}
           </div>
 
+          <div className="border-t" />
+
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium uppercase text-muted-foreground">Severity</span>
+            <span className="flex items-center gap-1 text-xs font-medium uppercase text-muted-foreground">
+              <SlidersHorizontal className="size-3.5" />
+              Severity
+            </span>
             {SEVERITY_OPTIONS.map((s) => (
               <button
                 key={s}
@@ -230,7 +235,7 @@ export function DefectsPage() {
                     return next
                   })
                 }
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
                   selectedSeverities.has(s)
                     ? DEFECT_SEVERITY_BADGE_CLASS[s]
                     : 'border-input text-muted-foreground'
