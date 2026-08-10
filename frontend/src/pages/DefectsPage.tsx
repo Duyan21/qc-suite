@@ -32,8 +32,8 @@ const SEVERITY_RANK: Record<DefectSeverity, number> = {
 
 const SEVERITY_DOT_CLASS: Record<DefectSeverity, string> = {
   Critical: 'bg-red-500',
-  High: 'bg-amber-500',
-  Medium: 'bg-amber-500',
+  High: 'bg-orange-500',
+  Medium: 'bg-yellow-500',
   Low: 'bg-muted-foreground',
 }
 
@@ -288,9 +288,11 @@ export function DefectsPage() {
                 className={`flex-row gap-3 border-l-4 p-4 cursor-pointer transition-colors hover:bg-muted/50 ${
                   d.severity === 'Critical'
                     ? 'border-l-red-500'
-                    : d.severity === 'High' || d.severity === 'Medium'
-                      ? 'border-l-amber-500'
-                      : 'border-l-muted-foreground/30'
+                    : d.severity === 'High'
+                      ? 'border-l-orange-500'
+                      : d.severity === 'Medium'
+                        ? 'border-l-yellow-500'
+                        : 'border-l-muted-foreground/30'
                 }`}
               >
                 <div className="min-w-0 flex-1">
