@@ -82,6 +82,17 @@ def test_list_requirements_search_matches_title(client, auth_headers, project):
     assert "OTP" in data["items"][0]["title"]
 
 
+def test_list_requirements_search_matches_req_id(client, auth_headers, project):
+    created = _create_requirement(client, auth_headers, project.id, title="OTP login flow").json()
+    _create_requirement(client, auth_headers, project.id, title="Password reset")
+    response = client.get(
+        f"/requirements?project_id={project.id}&search={created['req_id']}", headers=auth_headers
+    )
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["req_id"] == created["req_id"]
+
+
 def test_get_requirement_detail_by_id(client, auth_headers, project):
     created = _create_requirement(client, auth_headers, project.id).json()
     response = client.get(f"/requirements/{created['id']}", headers=auth_headers)
