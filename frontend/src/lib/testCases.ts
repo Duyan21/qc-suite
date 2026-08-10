@@ -6,6 +6,13 @@ export { REQUIREMENT_STATUS_BADGE_CLASS as TC_STATUS_BADGE_CLASS } from './requi
 export type TestCaseStatus = 'Draft' | 'Active' | 'Deprecated'
 export type TestCasePriority = 'High' | 'Medium' | 'Low'
 
+export type TestCaseSummary = {
+  id: number
+  code: string
+  title: string
+  status: string
+}
+
 export type TestCaseListItem = {
   id: number
   code: string
@@ -113,4 +120,23 @@ export async function createTestCase(payload: {
   requirement_id: number
 }): Promise<TestCase> {
   return authFetch<TestCase>('/test-cases', { method: 'POST', body: payload })
+}
+
+export async function updateTestCase(
+  id: number,
+  payload: {
+    title: string
+    preconditions?: string
+    steps?: string
+    expected_result: string
+    priority: TestCasePriority
+    status: TestCaseStatus
+    requirement_id: number
+  },
+): Promise<TestCase> {
+  return authFetch<TestCase>(`/test-cases/${id}`, { method: 'PUT', body: payload })
+}
+
+export async function deleteTestCase(id: number): Promise<TestCase> {
+  return authFetch<TestCase>(`/test-cases/${id}`, { method: 'DELETE' })
 }

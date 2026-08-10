@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Pencil, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { formatDate } from '@/lib/utils'
+import { useCurrentProject } from '@/lib/currentProject'
 import {
   getTestCase,
   getTestCaseResults,
@@ -13,10 +16,18 @@ import {
   type TestCaseDetail,
   type TestCaseExecutionHistoryItem,
 } from '@/lib/testCases'
+import { EditTestCaseDialog } from '@/components/EditTestCaseDialog'
+import { DeleteTestCaseDialog } from '@/components/DeleteTestCaseDialog'
+import { useToast } from '@/lib/toast'
 
 export function TestCaseDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
+  const toast = useToast()
+  const { project } = useCurrentProject()
   const [testCase, setTestCase] = useState<TestCaseDetail | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [history, setHistory] = useState<TestCaseExecutionHistoryItem[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [notFound, setNotFound] = useState(false)
@@ -93,13 +104,31 @@ export function TestCaseDetailPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          <Link to="/testcases" className="hover:underline">Test Cases</Link> {'>'} {testCase.code}
-        </p>
-        <h1 className="font-heading text-xl font-semibold">
-          {testCase.code}: {testCase.title}
-        </h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">
+            <Link to="/testcases" className="hover:underline">Test Cases</Link> {'>'} {testCase.code}
+          </p>
+          <h1 className="font-heading text-xl font-semibold">
+            {testCase.code}: {testCase.title}
+          </h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!project}
+            onClick={() => setEditOpen(true)}
+          >
+            <Pencil className="size-3.5" />
+            Sửa
+          </Button>
+          <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+            <Trash2 className="size-3.5" />
+            Xóa
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
@@ -203,6 +232,29 @@ export function TestCaseDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {project && (
+        <EditTestCaseDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          projectId={project.id}
+          testCase={testCase}
+          onUpdated={(updated, requirement) => {
+            setTestCase((tc) => (tc ? { ...tc, ...updated, requirement } : tc))
+            toast.success(`Đã cập nhật test case ${updated.code}.`)
+          }}
+        />
+      )}
+      <DeleteTestCaseDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        testCase={{ id: testCase.id, code: testCase.code }}
+        onDeleted={() => {
+          const code = testCase.code
+          navigate('/testcases')
+          toast.success(`Đã xóa test case ${code}.`)
+        }}
+      />
     </div>
   )
 }

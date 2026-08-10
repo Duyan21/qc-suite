@@ -145,6 +145,24 @@ def test_traceability_excludes_other_projects_and_old_versions(client, auth_head
     assert data["items"][0]["version"] == 2
 
 
+def test_traceability_excludes_deprecated_test_case_after_delete(client, auth_headers, project, db_session):
+    req = _create_requirement(db_session, project.id)
+    tc = _create_test_case(db_session, req.id)
+
+    delete_response = client.delete(f"/test-cases/{tc.id}", headers=auth_headers)
+    assert delete_response.status_code == 200
+    assert delete_response.json()["status"] == "Deprecated"
+
+    response = client.get(f"/traceability?project_id={project.id}", headers=auth_headers)
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    tc_ids = [item_tc["id"] for item_tc in item["test_cases"]]
+    assert tc.id not in tc_ids
+    assert item["test_cases"] == []
+    assert item["is_uncovered"] is True
+    assert item["coverage_percent"] == 0.0
+
+
 def test_traceability_new_version_does_not_inherit_old_version_coverage(client, auth_headers, project, db_session):
     versioned_req_id = next_code(db_session, Requirement, "req_id", "REQ")
     old_version = _create_requirement(db_session, project.id, req_id=versioned_req_id, version=1, is_current=False)

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +25,7 @@ import {
   type TestCasePriority,
 } from '@/lib/testCases'
 import { NewTestCaseDialog } from '@/components/NewTestCaseDialog'
+import { DeleteTestCaseDialog } from '@/components/DeleteTestCaseDialog'
 import { useToast } from '@/lib/toast'
 
 const PAGE_SIZE = 20
@@ -44,6 +45,7 @@ export function TestCasesPage() {
   const { project } = useCurrentProject()
   const toast = useToast()
   const [newOpen, setNewOpen] = useState(false)
+  const [deletingTestCase, setDeletingTestCase] = useState<{ id: number; code: string } | null>(null)
   const [data, setData] = useState<TestCaseListResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -193,7 +195,8 @@ export function TestCasesPage() {
                 <TableHead>Priority</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Req Linked</TableHead>
-                <TableHead className="pr-4">Updated</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="w-8 pr-4" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -225,7 +228,20 @@ export function TestCasesPage() {
                       '—'
                     )}
                   </TableCell>
-                  <TableCell className="pr-4 text-muted-foreground">{formatDate(tc.updated_at)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(tc.updated_at)}</TableCell>
+                  <TableCell className="pr-4">
+                    {tc.status !== 'Deprecated' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Xóa"
+                        onClick={() => setDeletingTestCase({ id: tc.id, code: tc.code })}
+                      >
+                        <Trash2 />
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -273,6 +289,27 @@ export function TestCasesPage() {
           }}
         />
       )}
+
+      <DeleteTestCaseDialog
+        open={deletingTestCase !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletingTestCase(null)
+        }}
+        testCase={deletingTestCase}
+        onDeleted={(deletedId) => {
+          setData((d) =>
+            d
+              ? {
+                  ...d,
+                  items: d.items.filter((tc) => tc.id !== deletedId),
+                  total: d.total - 1,
+                }
+              : d,
+          )
+          toast.success(`Đã xóa test case ${deletingTestCase?.code ?? ''}.`)
+          setDeletingTestCase(null)
+        }}
+      />
     </div>
   )
 }

@@ -44,6 +44,23 @@ EXECUTION_RESULTS_WEIGHTED = ["Pass"] * 7 + ["Fail"] + ["Skip"] + ["Blocked"]
 OPEN_DEFECT_STATUSES = {"New", "Assigned", "In Progress", "Ready for Retest"}
 CLOSED_DEFECT_STATUSES = {"Fixed", "Closed"}
 
+# backend/seed_data/defects.json carries legacy workflow-style status strings
+# (New/Assigned/In Progress/Ready for Retest/Fixed) that predate the 4-value
+# canonical DefectStatus enum (Open/Fixed/Closed/Wont-Fix) defined in
+# backend/schemas/defects.py. The frontend filters, /defects/stats, and badge
+# coloring all key off exactly those four strings, so only the mapped value
+# is ever written to the defects.status column here — the raw legacy string
+# from the JSON is left untouched everywhere else (fixed_in_version lookup,
+# test-run pass/fail logic) so seed-generation behavior is unchanged except
+# for the status column itself.
+LEGACY_TO_CANONICAL_DEFECT_STATUS = {
+    "New": "Open",
+    "Assigned": "Open",
+    "In Progress": "Open",
+    "Ready for Retest": "Open",
+    "Fixed": "Fixed",
+}
+
 
 def load_json(name):
     with open(os.path.join(SEED_DATA_DIR, name), encoding="utf-8") as f:
@@ -146,7 +163,7 @@ def seed_test_cases(db, requirements, tc_data):
     return test_cases
 
 
-def seed_defects(db, test_cases, requirements, defect_data, releases):
+def seed_defects(db, project, test_cases, requirements, defect_data, releases):
     fixed_in = next(r for r in releases if r.version_name == "v1.1.0-UAT").version_name
     defects = {}
     for row in defect_data:
@@ -163,11 +180,12 @@ def seed_defects(db, test_cases, requirements, defect_data, releases):
             title=row["summary"],
             description=description,
             severity=row["severity"],
-            status=row["status"],
+            status=LEGACY_TO_CANONICAL_DEFECT_STATUS.get(row["status"], row["status"]),
             testcase_id=test_cases[row["tc_id"]].id if row["tc_id"] else None,
             requirement_id=requirements[row["req_id"]].id if row["req_id"] else None,
             found_in_version=row["environment"],
             fixed_in_version=fixed_in if row["status"] in CLOSED_DEFECT_STATUSES else None,
+            project_id=project.id,
         )
         db.add(defect)
         defects[row["def_id"]] = defect
@@ -236,7 +254,7 @@ def main():
         releases = seed_releases(db, project)
         requirements = seed_requirements(db, project, req_data)
         test_cases = seed_test_cases(db, requirements, tc_data)
-        defects = seed_defects(db, test_cases, requirements, defect_data, releases)
+        defects = seed_defects(db, project, test_cases, requirements, defect_data, releases)
         results = seed_test_runs(db, releases, test_cases, defect_data)
 
         db.commit()

@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { listRequirements, type RequirementSummary } from '@/lib/requirements'
+import { listTestCases } from '@/lib/testCases'
+import type { TestCaseSummary } from '@/lib/testCases'
 
-type RequirementComboboxProps = {
+type TestCaseComboboxProps = {
   projectId: number
-  value: RequirementSummary | null
-  onChange: (requirement: RequirementSummary) => void
+  value: TestCaseSummary | null
+  onChange: (testCase: TestCaseSummary) => void
 }
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -19,11 +20,11 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced
 }
 
-export function RequirementCombobox({ projectId, value, onChange }: RequirementComboboxProps) {
+export function TestCaseCombobox({ projectId, value, onChange }: TestCaseComboboxProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
-  const [results, setResults] = useState<RequirementSummary[]>([])
+  const [results, setResults] = useState<TestCaseSummary[]>([])
   const [loading, setLoading] = useState(false)
   const requestIdRef = useRef(0)
 
@@ -31,10 +32,12 @@ export function RequirementCombobox({ projectId, value, onChange }: RequirementC
     if (!open) return
     const requestId = ++requestIdRef.current
     setLoading(true)
-    listRequirements(projectId, { search: debouncedSearch || undefined, limit: 20 })
+    listTestCases({ project_id: projectId, search: debouncedSearch || undefined, limit: 20 })
       .then((result) => {
         if (requestIdRef.current !== requestId) return
-        setResults(result.items)
+        setResults(
+          result.items.map((tc) => ({ id: tc.id, code: tc.code, title: tc.title, status: tc.status })),
+        )
       })
       .catch(() => {
         if (requestIdRef.current !== requestId) return
@@ -50,12 +53,12 @@ export function RequirementCombobox({ projectId, value, onChange }: RequirementC
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" className="w-full justify-start overflow-hidden font-normal">
-          <span className="truncate">{value ? `${value.req_id} — ${value.title}` : 'Chọn requirement...'}</span>
+          <span className="truncate">{value ? `${value.code} — ${value.title}` : 'Chọn test case...'}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-2" align="start">
         <Input
-          placeholder="Tìm requirement..."
+          placeholder="Tìm test case..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="mb-2"
@@ -63,22 +66,22 @@ export function RequirementCombobox({ projectId, value, onChange }: RequirementC
         />
         {loading && <p className="px-1 py-1 text-sm text-muted-foreground">Đang tải...</p>}
         {!loading && results.length === 0 && (
-          <p className="px-1 py-1 text-sm text-muted-foreground">Không tìm thấy requirement nào.</p>
+          <p className="px-1 py-1 text-sm text-muted-foreground">Không tìm thấy test case nào.</p>
         )}
         {!loading && results.length > 0 && (
           <div className="flex max-h-60 flex-col gap-0.5 overflow-y-auto">
-            {results.map((req) => (
+            {results.map((tc) => (
               <button
-                key={req.id}
+                key={tc.id}
                 type="button"
                 onClick={() => {
-                  onChange(req)
+                  onChange(tc)
                   setOpen(false)
                 }}
                 className="cursor-pointer rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
               >
-                <span className="font-medium">{req.req_id}</span>{' '}
-                <span className="text-muted-foreground">{req.title}</span>
+                <span className="font-medium">{tc.code}</span>{' '}
+                <span className="text-muted-foreground">{tc.title}</span>
               </button>
             ))}
           </div>

@@ -195,6 +195,33 @@ def test_delete_test_case_soft_deletes(client, auth_headers, db_session):
     assert still_there.status_code == 200
 
 
+def test_list_test_cases_excludes_deprecated_by_default(client, auth_headers, db_session):
+    req = _create_requirement_row(db_session)
+    active = _create_test_case(client, auth_headers, req.id, title="Active one").json()
+    deprecated = _create_test_case(client, auth_headers, req.id, title="Deprecated one").json()
+    client.delete(f"/test-cases/{deprecated['id']}", headers=auth_headers)
+
+    response = client.get(f"/test-cases?requirement_id={req.id}", headers=auth_headers)
+    data = response.json()
+    ids = [item["id"] for item in data["items"]]
+    assert active["id"] in ids
+    assert deprecated["id"] not in ids
+    assert data["total"] == 1
+
+
+def test_list_test_cases_explicit_deprecated_filter_still_works(client, auth_headers, db_session):
+    req = _create_requirement_row(db_session)
+    deprecated = _create_test_case(client, auth_headers, req.id, title="Deprecated one").json()
+    client.delete(f"/test-cases/{deprecated['id']}", headers=auth_headers)
+
+    response = client.get(
+        f"/test-cases?requirement_id={req.id}&status=Deprecated", headers=auth_headers
+    )
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["id"] == deprecated["id"]
+
+
 def test_execute_test_case_creates_then_updates_result(client, auth_headers, db_session):
     req = _create_requirement_row(db_session)
     release = _create_release_row(db_session)

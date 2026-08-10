@@ -110,11 +110,13 @@ def test_update_requirement_creates_new_version_and_history_has_three(client, au
     assert v2["is_current"] is True
     assert v2["previous_version_id"] == v1["id"]
     assert v2["req_id"] == v1["req_id"]
+    assert v2["id"] != v1["id"]
 
     update_body_2 = {**update_body, "title": "User can log in (v3)", "change_note": "Fix wording"}
     v3_response = client.put(f"/requirements/{v2['id']}", json=update_body_2, headers=auth_headers)
     v3 = v3_response.json()
     assert v3["version"] == 3
+    assert v3["id"] != v2["id"]
 
     history_response = client.get(f"/requirements/{v1['req_id']}/history", headers=auth_headers)
     assert history_response.status_code == 200
@@ -124,6 +126,21 @@ def test_update_requirement_creates_new_version_and_history_has_three(client, au
     assert history[0]["is_current"] is False
     assert history[1]["is_current"] is False
     assert history[2]["is_current"] is True
+
+
+def test_update_requirement_rejects_non_current_version(client, auth_headers, project):
+    v1 = _create_requirement(client, auth_headers, project.id).json()
+
+    update_body = {
+        "title": "User can log in (v2)",
+        "description": "Adds OTP step",
+        "status": "Active",
+    }
+    client.put(f"/requirements/{v1['id']}", json=update_body, headers=auth_headers)
+
+    # v1 is no longer current — a second PUT against it must be rejected
+    response = client.put(f"/requirements/{v1['id']}", json=update_body, headers=auth_headers)
+    assert response.status_code == 400
 
 
 def test_requirements_require_auth(client, project):
@@ -148,3 +165,63 @@ def test_list_requirements_paginates_across_pages(client, auth_headers, project)
     page2_ids = [item["id"] for item in page2["items"]]
     assert page2_ids == [r3["id"]]
     assert not set(page2_ids) & set(page1_ids)
+
+
+def test_delete_requirement_creates_deprecated_version(client, auth_headers, project):
+    v1 = _create_requirement(client, auth_headers, project.id).json()
+
+    response = client.delete(f"/requirements/{v1['id']}", headers=auth_headers)
+    assert response.status_code == 200
+    deleted = response.json()
+    assert deleted["status"] == "Deprecated"
+    assert deleted["version"] == 2
+    assert deleted["is_current"] is True
+    assert deleted["previous_version_id"] == v1["id"]
+    assert deleted["id"] != v1["id"]
+    assert deleted["req_id"] == v1["req_id"]
+    assert deleted["title"] == v1["title"]
+    assert deleted["description"] == v1["description"]
+    assert deleted["change_note"] is None
+
+    old = client.get(f"/requirements/{v1['id']}", headers=auth_headers).json()
+    assert old["is_current"] is False
+
+
+def test_delete_requirement_missing_returns_404(client, auth_headers):
+    response = client.delete("/requirements/999999", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_delete_requirement_rejects_non_current_version(client, auth_headers, project):
+    v1 = _create_requirement(client, auth_headers, project.id).json()
+    client.delete(f"/requirements/{v1['id']}", headers=auth_headers)
+
+    response = client.delete(f"/requirements/{v1['id']}", headers=auth_headers)
+    assert response.status_code == 400
+
+
+def test_delete_requirement_requires_auth(client, project):
+    # The auth dependency rejects before the id is looked up, so the specific
+    # id value doesn't matter here — no need to create a real requirement first.
+    response = client.delete("/requirements/1")
+    assert response.status_code == 401
+
+
+def test_list_requirements_excludes_deprecated_by_default(client, auth_headers, project):
+    _create_requirement(client, auth_headers, project.id, title="Active one", status="Active")
+    deprecated_resp = _create_requirement(
+        client, auth_headers, project.id, title="Deprecated one", status="Deprecated"
+    )
+    deprecated = deprecated_resp.json()
+
+    response = client.get(f"/requirements?project_id={project.id}", headers=auth_headers)
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["title"] == "Active one"
+
+    explicit = client.get(
+        f"/requirements?project_id={project.id}&status=Deprecated", headers=auth_headers
+    )
+    explicit_data = explicit.json()
+    assert explicit_data["total"] == 1
+    assert explicit_data["items"][0]["id"] == deprecated["id"]

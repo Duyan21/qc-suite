@@ -36,6 +36,8 @@ def list_requirements(
     )
     if status_filter is not None:
         query = query.filter(Requirement.status == status_filter)
+    else:
+        query = query.filter(Requirement.status != "Deprecated")
     if search is not None:
         query = query.filter(Requirement.title.ilike(f"%{search}%"))
 
@@ -88,6 +90,8 @@ def update_requirement(
     old = db.get(Requirement, id)
     if old is None:
         raise HTTPException(status_code=404, detail="Requirement not found")
+    if not old.is_current:
+        raise HTTPException(status_code=400, detail="Requirement is not the current version")
 
     old.is_current = False
 
@@ -99,6 +103,38 @@ def update_requirement(
         status=payload.status,
         is_current=True,
         change_note=payload.change_note,
+        changed_by=current_user.email,
+        previous_version_id=old.id,
+        project_id=old.project_id,
+    )
+    db.add(new)
+    db.commit()
+    db.refresh(new)
+    return new
+
+
+@router.delete("/{id}", response_model=RequirementResponse)
+def delete_requirement(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    old = db.get(Requirement, id)
+    if old is None:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+    if not old.is_current:
+        raise HTTPException(status_code=400, detail="Requirement is not the current version")
+
+    old.is_current = False
+
+    new = Requirement(
+        req_id=old.req_id,
+        version=old.version + 1,
+        title=old.title,
+        description=old.description,
+        status="Deprecated",
+        is_current=True,
+        change_note=None,
         changed_by=current_user.email,
         previous_version_id=old.id,
         project_id=old.project_id,
