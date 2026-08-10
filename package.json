@@ -3,9 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "docker-compose up -d db && concurrently -n backend,frontend -c green,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev": "docker-compose up -d --wait db && npm run db:migrate && concurrently -n backend,frontend -c green,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
     "dev:backend": "cd backend && venv\\Scripts\\python.exe -m uvicorn main:app --reload --port 8000",
-    "dev:frontend": "cd frontend && npm run dev"
+    "dev:frontend": "cd frontend && npm run dev",
+    "db:migrate": "cd backend && venv\\Scripts\\python.exe -m alembic upgrade head"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

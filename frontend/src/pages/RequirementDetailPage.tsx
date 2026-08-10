@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { History as HistoryIcon, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -192,6 +192,7 @@ export function RequirementDetailPage() {
             title={requirement.is_current ? undefined : 'Chỉ có thể sửa phiên bản hiện tại'}
             onClick={() => setEditOpen(true)}
           >
+            <Pencil className="size-3.5" />
             Sửa
           </Button>
           <Button
@@ -208,9 +209,11 @@ export function RequirementDetailPage() {
             }
             onClick={() => setDeleteOpen(true)}
           >
+            <Trash2 className="size-3.5" />
             Xóa
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={openHistory}>
+            <HistoryIcon className="size-3.5" />
             History
           </Button>
           <Button

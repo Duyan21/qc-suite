@@ -145,13 +145,13 @@ export function RequirementsPage() {
             placeholder="Tìm kiếm requirement..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="sm:max-w-xs"
+            className="sm:max-w-xs md:text-base"
           />
           <Select
             value={statusFilter}
             onValueChange={(value) => setStatusFilter(value as RequirementStatus | 'all')}
           >
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full text-base sm:w-40">
               <SelectValue placeholder="Status: All" />
             </SelectTrigger>
             <SelectContent>

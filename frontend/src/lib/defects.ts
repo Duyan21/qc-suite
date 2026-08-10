@@ -55,8 +55,8 @@ export type DefectListParams = {
 
 export const DEFECT_SEVERITY_BADGE_CLASS: Record<string, string> = {
   Critical: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
-  High: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-  Medium: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+  High: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400',
+  Medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-400',
   Low: 'bg-muted text-muted-foreground',
 }
 
