@@ -144,9 +144,7 @@ export function DefectsPage() {
         <div>
           <h1 className="font-heading text-xl font-semibold">Defects</h1>
           <p className="text-sm text-muted-foreground">
-            {stats
-              ? `${stats.total} defects · ${stats.by_status.Open ?? 0} Open · ${stats.by_severity.Critical ?? 0} Critical`
-              : ' '}
+            {project ? `${allDefects.length} defects · ${openCount} open · ${criticalCount} critical` : ' '}
           </p>
         </div>
         <Button
@@ -159,23 +157,6 @@ export function DefectsPage() {
           Log Defect
         </Button>
       </div>
-
-      {stats && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-          {STATUS_OPTIONS.map((s) => (
-            <Card key={s} className="items-center gap-1 py-3 text-center">
-              <p className="text-2xl font-semibold">{stats.by_status[s] ?? 0}</p>
-              <p className="text-xs text-muted-foreground">{s}</p>
-            </Card>
-          ))}
-          {SEVERITY_OPTIONS.map((s) => (
-            <Card key={s} className="items-center gap-1 py-3 text-center">
-              <p className="text-2xl font-semibold">{stats.by_severity[s] ?? 0}</p>
-              <p className="text-xs text-muted-foreground">{s}</p>
-            </Card>
-          ))}
-        </div>
-      )}
 
       <Card>
         <div className="flex flex-col gap-3 px-4 pt-4">
@@ -265,49 +246,51 @@ export function DefectsPage() {
         {project && error && (
           <div className="flex items-center gap-3 px-4">
             <p className="text-sm text-destructive">{error}</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => load(project.id, page, severityFilter, statusFilter, debouncedSearch)}
-            >
+            <Button size="sm" variant="outline" onClick={() => load(project.id)}>
               Thử lại
             </Button>
           </div>
         )}
-        {project && !loading && !error && data && data.items.length === 0 && (
+        {project && !loading && !error && (
+          <p className="flex items-center justify-between px-4 text-xs text-muted-foreground">
+            <span>{filteredSorted.length} kết quả</span>
+            <span>Sắp xếp: severity → ngày tạo</span>
+          </p>
+        )}
+        {project && !loading && !error && pageItems.length === 0 && (
           <p className="px-4 text-sm text-muted-foreground">Không tìm thấy defect nào.</p>
         )}
-        {project && !loading && !error && data && data.items.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-4">ID</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Severity</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Linked TC</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="pr-4">Fixed</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.items.map((d: DefectListItem) => (
-                <TableRow key={d.id}>
-                  <TableCell className="pl-4">
+        {project && !loading && !error && pageItems.length > 0 && (
+          <div className="flex flex-col gap-2 px-4">
+            {pageItems.map((d: DefectListItem) => (
+              <Card
+                key={d.id}
+                className={`flex-row gap-3 border-l-4 p-4 ${
+                  d.severity === 'Critical'
+                    ? 'border-l-red-500'
+                    : d.severity === 'High' || d.severity === 'Medium'
+                      ? 'border-l-amber-500'
+                      : 'border-l-muted-foreground/30'
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Link to={`/defects/${d.id}`} className="text-primary underline-offset-4 hover:underline">
                       {d.code}
                     </Link>
-                  </TableCell>
-                  <TableCell>{d.title}</TableCell>
-                  <TableCell>
                     <Badge className={DEFECT_SEVERITY_BADGE_CLASS[d.severity ?? ''] ?? ''}>
                       {d.severity ?? '—'}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
                     <Badge className={DEFECT_STATUS_BADGE_CLASS[d.status] ?? ''}>{d.status}</Badge>
-                  </TableCell>
-                  <TableCell>
+                  </div>
+                  <p className="mt-1 font-semibold">{d.title}</p>
+                  {d.description && (
+                    <p className="truncate text-sm text-muted-foreground">{d.description}</p>
+                  )}
+                </div>
+                <div className="grid shrink-0 grid-cols-3 gap-4 text-right text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Linked TC</p>
                     {d.test_case ? (
                       <Link
                         to={`/testcases/${d.test_case.id}`}
@@ -316,21 +299,27 @@ export function DefectsPage() {
                         {d.test_case.code}
                       </Link>
                     ) : (
-                      '—'
+                      <p>—</p>
                     )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{formatDate(d.created_at)}</TableCell>
-                  <TableCell className="pr-4">{d.fixed_in_version ?? '—'}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Created</p>
+                    <p>{formatDate(d.created_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Fixed</p>
+                    <p>{d.fixed_in_version ?? '—'}</p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         )}
 
-        {project && !loading && !error && data && data.total > 0 && (
+        {project && !loading && !error && filteredSorted.length > 0 && (
           <div className="flex items-center justify-between px-4 pt-2">
             <p className="text-sm text-muted-foreground">
-              Trang {data.page} / {totalPages}
+              Trang {page} / {totalPages}
             </p>
             <div className="flex items-center gap-1">
               <Button
@@ -360,8 +349,7 @@ export function DefectsPage() {
           onOpenChange={setNewOpen}
           projectId={project.id}
           onCreated={(defect) => {
-            load(project.id, page, severityFilter, statusFilter, debouncedSearch)
-            loadStats()
+            load(project.id)
             toast.success(`Đã tạo defect ${defect.code}.`, {
               href: `/defects/${defect.id}`,
               linkLabel: 'Xem defect →',
