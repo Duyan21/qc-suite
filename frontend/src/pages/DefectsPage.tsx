@@ -173,31 +173,33 @@ export function DefectsPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="sm:max-w-sm"
             />
-            <button
-              type="button"
-              onClick={() => setSelectedStatus('all')}
-              className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                selectedStatus === 'all'
-                  ? 'border-foreground bg-foreground text-background'
-                  : 'border-input text-muted-foreground'
-              }`}
-            >
-              All {allDefects.length}
-            </button>
-            {STATUS_OPTIONS.map((s) => (
+            <div className="inline-flex items-center rounded-full border border-input p-1">
               <button
-                key={s}
                 type="button"
-                onClick={() => setSelectedStatus(s)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                  selectedStatus === s
-                    ? 'border-foreground bg-foreground text-background'
-                    : 'border-input text-muted-foreground'
+                onClick={() => setSelectedStatus('all')}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  selectedStatus === 'all'
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {s} {statusCounts[s]}
+                All {allDefects.length}
               </button>
-            ))}
+              {STATUS_OPTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSelectedStatus(s)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    selectedStatus === s
+                      ? 'bg-foreground text-background'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {s} {statusCounts[s]}
+                </button>
+              ))}
+            </div>
             {activeFilterCount > 0 && (
               <Button
                 type="button"
