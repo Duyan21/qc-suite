@@ -33,6 +33,39 @@ const PAGE_SIZE = 20
 const SEVERITY_OPTIONS: DefectSeverity[] = ['Critical', 'High', 'Medium', 'Low']
 const STATUS_OPTIONS: DefectStatus[] = ['Open', 'Fixed', 'Closed', 'Wont-Fix']
 
+const SEVERITY_RANK: Record<DefectSeverity, number> = {
+  Critical: 3,
+  High: 2,
+  Medium: 1,
+  Low: 0,
+}
+
+function matchesDefectFilters(
+  d: DefectListItem,
+  opts: { search: string; severities: Set<DefectSeverity>; statuses: Set<DefectStatus> },
+): boolean {
+  const { search, severities, statuses } = opts
+  if (search) {
+    const q = search.toLowerCase()
+    const haystack = `${d.code} ${d.title}`.toLowerCase()
+    if (!haystack.includes(q)) return false
+  }
+  if (severities.size > 0) {
+    if (!d.severity || !severities.has(d.severity as DefectSeverity)) return false
+  }
+  if (statuses.size > 0) {
+    if (!statuses.has(d.status as DefectStatus)) return false
+  }
+  return true
+}
+
+function compareDefects(a: DefectListItem, b: DefectListItem): number {
+  const rankA = a.severity ? SEVERITY_RANK[a.severity as DefectSeverity] ?? -1 : -1
+  const rankB = b.severity ? SEVERITY_RANK[b.severity as DefectSeverity] ?? -1 : -1
+  if (rankA !== rankB) return rankB - rankA
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+}
+
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value)
   useEffect(() => {
