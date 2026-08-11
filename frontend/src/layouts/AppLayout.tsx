@@ -111,13 +111,14 @@ export function AppLayout() {
                   onClick={() => setMobileNavOpen(false)}
                   className={({ isActive }) =>
                     cn(
-                      'rounded-md px-2.5 py-2 text-sm',
+                      'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm',
                       isActive
                         ? 'bg-sidebar-primary font-medium text-sidebar-primary-foreground'
                         : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                     )
                   }
                 >
+                  <item.icon className="size-4 shrink-0" />
                   {item.label}
                 </NavLink>
               ))}
