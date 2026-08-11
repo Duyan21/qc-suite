@@ -1,4 +1,17 @@
-import type { ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
+import {
+  LayoutGrid,
+  ListChecks,
+  FlaskConical,
+  Bug,
+  Waypoints,
+  Search,
+  Sparkles,
+  PlayCircle,
+  FileBarChart,
+  Settings,
+  type LucideProps,
+} from 'lucide-react'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { RequirementsPage } from '@/pages/RequirementsPage'
 import { TestCasesPage } from '@/pages/TestCasesPage'
@@ -13,6 +26,7 @@ import { AdminPage } from '@/pages/AdminPage'
 export interface NavItem {
   path: string
   label: string
+  icon: ComponentType<LucideProps>
   element: ReactNode
 }
 
@@ -24,33 +38,33 @@ export interface NavSection {
 export const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Overview',
-    items: [{ path: '/dashboard', label: 'Dashboard', element: <DashboardPage /> }],
+    items: [{ path: '/dashboard', label: 'Dashboard', icon: LayoutGrid, element: <DashboardPage /> }],
   },
   {
     label: 'Quản lý',
     items: [
-      { path: '/requirements', label: 'Requirements', element: <RequirementsPage /> },
-      { path: '/testcases', label: 'Test Cases', element: <TestCasesPage /> },
-      { path: '/defects', label: 'Defects', element: <DefectsPage /> },
-      { path: '/traceability', label: 'Traceability', element: <TraceabilityPage /> },
+      { path: '/requirements', label: 'Requirements', icon: ListChecks, element: <RequirementsPage /> },
+      { path: '/testcases', label: 'Test Cases', icon: FlaskConical, element: <TestCasesPage /> },
+      { path: '/defects', label: 'Defects', icon: Bug, element: <DefectsPage /> },
+      { path: '/traceability', label: 'Traceability', icon: Waypoints, element: <TraceabilityPage /> },
     ],
   },
   {
     label: 'AI Tools',
     items: [
-      { path: '/search', label: 'Semantic Search', element: <SemanticSearchPage /> },
-      { path: '/agent', label: 'Impact Agent', element: <ImpactAgentPage /> },
+      { path: '/search', label: 'Semantic Search', icon: Search, element: <SemanticSearchPage /> },
+      { path: '/agent', label: 'Impact Agent', icon: Sparkles, element: <ImpactAgentPage /> },
     ],
   },
   {
     label: 'Release',
     items: [
-      { path: '/testruns', label: 'Test Runs', element: <TestRunPage /> },
-      { path: '/report', label: 'Release Report', element: <ReleaseReportPage /> },
+      { path: '/testruns', label: 'Test Runs', icon: PlayCircle, element: <TestRunPage /> },
+      { path: '/report', label: 'Release Report', icon: FileBarChart, element: <ReleaseReportPage /> },
     ],
   },
   {
     label: 'System',
-    items: [{ path: '/admin', label: 'Admin', element: <AdminPage /> }],
+    items: [{ path: '/admin', label: 'Admin', icon: Settings, element: <AdminPage /> }],
   },
 ]
