@@ -1,122 +1,24 @@
+// frontend/src/pages/TraceabilityPage.tsx
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Check, X, Diamond } from 'lucide-react'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { useCurrentProject } from '@/lib/currentProject'
-import {
-  getTraceability,
-  type TraceabilityResponse,
-  type TraceabilityRequirementItem,
-  type TraceabilityStatus,
-} from '@/lib/traceability'
+import { getTraceability, type TraceabilityResponse } from '@/lib/traceability'
+import { StatCards } from '@/components/traceability/StatCards'
+import { FilterBar } from '@/components/traceability/FilterBar'
+import { ListView } from '@/components/traceability/ListView'
+import { MatrixView } from '@/components/traceability/MatrixView'
+import { deriveRequirements, computeTraceabilityStats, type DerivedRequirement } from '@/components/traceability/deriveTraceability'
+import { DEFAULT_FILTERS, filterRequirements, type TraceabilityFilters } from '@/components/traceability/traceabilityFilters'
 
-type Column = { id: number; code: string }
+type ViewMode = 'list' | 'matrix'
 
-function deriveColumns(items: TraceabilityRequirementItem[]): Column[] {
+function deriveColumnsForExport(items: DerivedRequirement[]) {
   return items.flatMap((req) => req.test_cases.map((tc) => ({ id: tc.id, code: tc.code })))
 }
 
-function computeStats(items: TraceabilityRequirementItem[]) {
-  const allTestCases = items.flatMap((r) => r.test_cases)
-  const totalLinked = allTestCases.length
-  const executed = allTestCases.filter((tc) => tc.status === 'covered' || tc.status === 'failed').length
-  const covered = allTestCases.filter((tc) => tc.status === 'covered').length
-  return { totalLinked, executed, covered }
-}
-
-function StatusIcon({ status }: { status: TraceabilityStatus }) {
-  if (status === 'covered') return <Check className="size-4 text-green-600" aria-label="Pass" />
-  if (status === 'failed') return <X className="size-4 text-destructive" aria-label="Fail" />
-  return <Diamond className="size-4 text-blue-500" aria-label="Linked — not run" />
-}
-
-// Caps the matrix to the visible viewport (instead of growing to the full row
-// count) so the horizontal scrollbar sits on-screen and doesn't require
-// scrolling the page down to reach it. Vertical scrolling happens inside this
-// box instead.
-function useViewportBoundedHeight(bottomMargin = 24) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [maxHeight, setMaxHeight] = useState<number>()
-
-  useEffect(() => {
-    function update() {
-      if (!ref.current) return
-      const top = ref.current.getBoundingClientRect().top
-      setMaxHeight(Math.max(window.innerHeight - top - bottomMargin, 200))
-    }
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [bottomMargin])
-
-  return { ref, maxHeight }
-}
-
-function TraceabilityMatrix({ items }: { items: TraceabilityRequirementItem[] }) {
-  const columns = useMemo(() => deriveColumns(items), [items])
-  const { ref, maxHeight } = useViewportBoundedHeight()
-
-  return (
-    <Table
-      containerRef={ref}
-      containerClassName="overflow-y-auto"
-      containerStyle={{ maxHeight }}
-    >
-      <TableHeader>
-        <TableRow>
-          <TableHead className="sticky left-0 z-10 bg-card">Requirement</TableHead>
-          {columns.map((col) => (
-            <TableHead key={col.id}>{col.code}</TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((req) => {
-          const statusByTcId = new Map(req.test_cases.map((tc) => [tc.id, tc.status]))
-          return (
-            <TableRow key={req.id}>
-              <TableCell className="sticky left-0 z-10 bg-card">
-                <Link to={`/requirements/${req.id}`} className="text-primary underline-offset-4 hover:underline">
-                  {req.req_id}
-                </Link>
-                <div className="text-xs text-muted-foreground">{req.title}</div>
-              </TableCell>
-              {columns.map((col) => {
-                const status = statusByTcId.get(col.id)
-                return (
-                  <TableCell key={col.id}>
-                    {status && <StatusIcon status={status} />}
-                  </TableCell>
-                )
-              })}
-            </TableRow>
-          )
-        })}
-      </TableBody>
-    </Table>
-  )
-}
-
-function TraceabilityLegend() {
-  return (
-    <div className="flex items-center gap-4 px-4 text-sm text-muted-foreground">
-      <span className="flex items-center gap-1.5">
-        <Check className="size-4 text-green-600" /> Pass
-      </span>
-      <span className="flex items-center gap-1.5">
-        <X className="size-4 text-destructive" /> Fail
-      </span>
-      <span className="flex items-center gap-1.5">
-        <Diamond className="size-4 text-blue-500" /> Linked — not run
-      </span>
-    </div>
-  )
-}
-
-function exportCsv(items: TraceabilityRequirementItem[]) {
-  const columns = deriveColumns(items)
+function exportCsv(items: DerivedRequirement[]) {
+  const columns = deriveColumnsForExport(items)
   const header = ['Requirement', ...columns.map((c) => c.code)]
   const rows = items.map((req) => {
     const statusByTcId = new Map(req.test_cases.map((tc) => [tc.id, tc.status]))
@@ -140,8 +42,9 @@ export function TraceabilityPage() {
   const [data, setData] = useState<TraceabilityResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<ViewMode>('list')
+  const [filters, setFilters] = useState<TraceabilityFilters>(DEFAULT_FILTERS)
   const requestIdRef = useRef(0)
-  const stats = useMemo(() => (data ? computeStats(data.items) : null), [data?.items])
 
   useEffect(() => {
     if (!project) {
@@ -160,6 +63,7 @@ export function TraceabilityPage() {
       .then((result) => {
         if (requestIdRef.current !== requestId) return
         setData(result)
+        setFilters(DEFAULT_FILTERS)
       })
       .catch((err) => {
         if (requestIdRef.current !== requestId) return
@@ -171,22 +75,64 @@ export function TraceabilityPage() {
       })
   }
 
+  // `derived`/`filtered`/`stats` always default to an empty array/zeroed
+  // stats rather than staying null — every render check below keys off their
+  // `.length`, not `data.items.length`, so TypeScript can't complain about a
+  // possibly-null `data` (a bare `hasData` boolean would not narrow `data`).
+  const derived = useMemo<DerivedRequirement[]>(
+    () => (data ? deriveRequirements(data.items) : []),
+    [data],
+  )
+  const stats = useMemo(() => computeTraceabilityStats(derived), [derived])
+  const filtered = useMemo(() => filterRequirements(derived, filters), [derived, filters])
+
+  const hasData = !!project && !loading && !error && !!data
+  const hasRequirements = hasData && derived.length > 0
+  const isEmpty = hasData && derived.length === 0
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Traceability Matrix</CardTitle>
-        {project && !loading && !error && data && data.items.length > 0 && (
-          <Button size="sm" onClick={() => exportCsv(data.items)}>
-            Xuất CSV
-          </Button>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <CardTitle>Traceability Matrix</CardTitle>
+          {hasRequirements && (
+            <p className="text-sm text-muted-foreground">
+              {stats.totalRequirementCount} requirements · {stats.totalTestCaseCount} test cases ·{' '}
+              <span className="text-destructive">{stats.coverageGapCount} chưa được cover</span>
+            </p>
+          )}
+        </div>
+        {hasRequirements && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex overflow-hidden rounded-lg border">
+              <Button
+                type="button"
+                variant={view === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="rounded-none border-0"
+                onClick={() => setView('list')}
+              >
+                Danh sách
+              </Button>
+              <Button
+                type="button"
+                variant={view === 'matrix' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="rounded-none border-0"
+                onClick={() => setView('matrix')}
+              >
+                Ma trận
+              </Button>
+            </div>
+            <Button size="sm" onClick={() => exportCsv(filtered)}>
+              Xuất CSV
+            </Button>
+          </div>
         )}
       </CardHeader>
-      {!project && (
-        <p className="px-4 text-sm text-muted-foreground">Vui lòng chọn một dự án.</p>
-      )}
-      {project && loading && (
-        <p className="px-4 text-sm text-muted-foreground">Đang tải...</p>
-      )}
+
+      {!project && <p className="px-4 text-sm text-muted-foreground">Vui lòng chọn một dự án.</p>}
+      {project && loading && <p className="px-4 text-sm text-muted-foreground">Đang tải...</p>}
       {project && error && (
         <div className="flex items-center gap-3 px-4">
           <p className="text-sm text-destructive">{error}</p>
@@ -195,20 +141,25 @@ export function TraceabilityPage() {
           </Button>
         </div>
       )}
-      {project && !loading && !error && data && data.items.length === 0 && (
-        <p className="px-4 text-sm text-muted-foreground">Chưa có yêu cầu nào.</p>
-      )}
-      {project && !loading && !error && data && data.items.length > 0 && stats && (
-        <p className="px-4 text-sm text-muted-foreground">
-          {stats.totalLinked === 0
-            ? 'Chưa có test case nào được liên kết.'
-            : `Độ bao phủ: ${Math.round((stats.covered / stats.totalLinked) * 100)}% · ${stats.executed} / ${stats.totalLinked} TC đã thực thi`}
-        </p>
-      )}
-      {project && !loading && !error && data && data.items.length > 0 && (
+      {isEmpty && <p className="px-4 text-sm text-muted-foreground">Chưa có yêu cầu nào.</p>}
+
+      {hasRequirements && (
         <>
-          <TraceabilityLegend />
-          <TraceabilityMatrix items={data.items} />
+          <div className="px-4">
+            <StatCards stats={stats} />
+          </div>
+          <div className="px-4">
+            <FilterBar filters={filters} onFiltersChange={setFilters} />
+          </div>
+          {view === 'list' ? (
+            <ListView requirements={filtered} runStatusChips={filters.runStatusChips} />
+          ) : (
+            <MatrixView
+              requirements={filtered}
+              runStatusChips={filters.runStatusChips}
+              moduleFilterActive={filters.module !== 'all'}
+            />
+          )}
         </>
       )}
     </Card>
