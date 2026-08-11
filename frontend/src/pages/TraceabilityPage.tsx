@@ -84,7 +84,11 @@ export function TraceabilityPage() {
     [data],
   )
   const stats = useMemo(() => computeTraceabilityStats(derived), [derived])
-  const filtered = useMemo(() => filterRequirements(derived, filters), [derived, filters])
+  const filtered = useMemo(
+    () => filterRequirements(derived, filters),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [derived, filters.search, filters.module, filters.coverage],
+  )
 
   const hasData = !!project && !loading && !error && !!data
   const hasRequirements = hasData && derived.length > 0

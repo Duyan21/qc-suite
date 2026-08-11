@@ -51,7 +51,7 @@ export function computeTraceabilityStats(items: DerivedRequirement[]): Traceabil
   const fullyRunCount = items.filter((r) => r.isFullyRun).length
   const allTestCases = items.flatMap((r) => r.test_cases)
   const totalTestCaseCount = allTestCases.length
-  const executedTestCaseCount = allTestCases.filter((tc) => tc.status !== 'not_run').length
+  const executedTestCaseCount = allTestCases.filter((tc) => PASS_FAIL_STATUSES.has(tc.status)).length
   const coverageGapCount = items.filter((r) => r.is_uncovered).length
 
   return {

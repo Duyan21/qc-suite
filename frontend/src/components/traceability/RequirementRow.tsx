@@ -13,8 +13,8 @@ const COVERAGE_BADGE_CLASS: Record<DerivedRequirement['coverageBucket'], string>
 }
 
 const COVERAGE_BADGE_LABEL: Record<DerivedRequirement['coverageBucket'], string> = {
-  full: 'Full',
-  partial: 'Partial',
+  full: 'Tất cả pass',
+  partial: 'Còn fail/chưa chạy',
   none: 'Không có TC',
 }
 

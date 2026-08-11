@@ -19,8 +19,8 @@ import {
 
 const COVERAGE_OPTIONS: { value: CoverageFilterValue; label: string }[] = [
   { value: 'all', label: 'Mọi coverage' },
-  { value: 'full', label: 'Full coverage' },
-  { value: 'partial', label: 'Partial' },
+  { value: 'full', label: 'Tất cả pass' },
+  { value: 'partial', label: 'Còn fail/chưa chạy' },
   { value: 'none', label: 'Không có TC' },
 ]
 

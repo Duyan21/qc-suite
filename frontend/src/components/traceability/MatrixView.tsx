@@ -6,7 +6,7 @@ import type { TraceabilityStatus } from '@/lib/traceability'
 import type { DerivedRequirement } from './deriveTraceability'
 import { activeStatusesForChips, type RunStatusChip } from './traceabilityFilters'
 
-const MAX_MATRIX_COLUMNS = 120
+const MAX_MATRIX_COLUMNS = 400
 
 type MatrixColumn = { id: number; code: string }
 
@@ -20,6 +20,15 @@ const CELL_STATUS_CLASS: Record<TraceabilityStatus, string> = {
   skipped: 'bg-amber-400',
   not_run: 'bg-muted',
 }
+
+const CELL_LEGEND_LABEL: Record<TraceabilityStatus, string> = {
+  covered: 'Pass',
+  failed: 'Fail',
+  skipped: 'Skip',
+  not_run: 'Not Run',
+}
+
+const LEGEND_ORDER: readonly TraceabilityStatus[] = ['covered', 'failed', 'skipped', 'not_run']
 
 function useViewportBoundedHeight(bottomMargin = 24) {
   const ref = useRef<HTMLDivElement>(null)
@@ -65,6 +74,14 @@ export function MatrixView({
           Ma trận đang trải rộng toàn bộ module — chọn 1 module để các ô nằm gần nhau và dễ đọc hơn.
         </div>
       )}
+      <div className="flex flex-wrap items-center gap-3 px-4 text-xs text-muted-foreground">
+        {LEGEND_ORDER.map((status) => (
+          <span key={status} className="flex items-center gap-1.5">
+            <span className={cn('size-3 rounded-sm', CELL_STATUS_CLASS[status])} />
+            {CELL_LEGEND_LABEL[status]}
+          </span>
+        ))}
+      </div>
       <Table containerRef={ref} containerClassName="overflow-y-auto" containerStyle={{ maxHeight }}>
         <TableHeader>
           <TableRow>
