@@ -9,6 +9,7 @@ RequirementStatus = Literal["Draft", "Active", "Deprecated"]
 class RequirementCreate(BaseModel):
     title: str
     description: str
+    module: str | None = None
     status: RequirementStatus = "Draft"
     project_id: int
 
@@ -26,6 +27,7 @@ class RequirementResponse(BaseModel):
     version: int
     title: str
     description: str
+    module: str | None
     status: str
     is_current: bool
     change_note: str | None

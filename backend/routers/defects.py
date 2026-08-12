@@ -95,6 +95,7 @@ def create_defect(payload: DefectCreate, db: Session = Depends(get_db)):
         description=payload.description,
         severity=payload.severity,
         status=payload.status,
+        module=payload.module,
         testcase_id=payload.testcase_id,
         requirement_id=payload.requirement_id,
         project_id=payload.project_id,
