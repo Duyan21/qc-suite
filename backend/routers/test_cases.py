@@ -96,6 +96,7 @@ def create_test_case(payload: TestCaseCreate, db: Session = Depends(get_db)):
         steps=payload.steps,
         expected_result=payload.expected_result,
         priority=payload.priority,
+        module=payload.module,
         requirement_id=payload.requirement_id,
     )
     db.add(tc)

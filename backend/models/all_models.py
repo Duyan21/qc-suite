@@ -48,6 +48,7 @@ class Requirement(Base):
     version = Column(Integer, nullable=False)
     title = Column(Text, nullable=False)
     description = Column(Text, nullable=False)
+    module = Column(String(100), nullable=True)
     status = Column(String(20), default="Draft")
     is_current = Column(Boolean, default=False)
     change_note = Column(Text)
@@ -69,6 +70,7 @@ class TestCase(Base):
     expected_result = Column(Text, nullable=False)
     priority = Column(String(10))
     status = Column(String(20), default="Draft")
+    module = Column(String(100), nullable=True)
     requirement_id = Column(
         Integer, ForeignKey("requirements.id"), nullable=True
     )
@@ -87,6 +89,7 @@ class Defect(Base):
     description = Column(Text)
     severity = Column(String(20))
     status = Column(String(20), default="Open")
+    module = Column(String(100), nullable=True)
     testcase_id = Column(Integer, ForeignKey("test_cases.id"), nullable=True)
     requirement_id = Column(Integer, ForeignKey("requirements.id"), nullable=True)
     found_in_version = Column(String(50))

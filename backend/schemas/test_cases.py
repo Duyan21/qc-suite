@@ -16,6 +16,7 @@ class TestCaseCreate(BaseModel):
     steps: str | None = None
     expected_result: str
     priority: TestCasePriority
+    module: str | None = None
     requirement_id: int
 
 
@@ -38,6 +39,7 @@ class TestCaseResponse(BaseModel):
     expected_result: str
     priority: str | None
     status: str
+    module: str | None
     requirement_id: int | None
     created_at: datetime
     updated_at: datetime
