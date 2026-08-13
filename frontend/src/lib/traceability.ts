@@ -16,6 +16,7 @@ export type TraceabilityRequirementItem = {
   req_id: string
   version: number
   title: string
+  module: string | null
   status: string
   is_uncovered: boolean
   coverage_percent: number
