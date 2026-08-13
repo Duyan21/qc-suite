@@ -84,7 +84,9 @@ export function RequirementRow({
               {requirement.failCount} fail
             </Badge>
           )}
-          <span className="ml-auto text-xs text-muted-foreground">{requirement.mockModule}</span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {requirement.module ?? 'Chưa phân loại'}
+          </span>
         </div>
         <div className="pl-6 text-sm">{requirement.title}</div>
         <div className="flex items-center gap-2 pl-6">

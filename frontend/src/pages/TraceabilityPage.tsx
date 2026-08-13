@@ -89,6 +89,14 @@ export function TraceabilityPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [derived, filters.search, filters.module, filters.coverage],
   )
+  const moduleOptions = useMemo(() => {
+    const modules = new Set<string>()
+    for (const req of derived) {
+      if (req.module) modules.add(req.module)
+    }
+    return [...modules].sort((a, b) => a.localeCompare(b))
+  }, [derived])
+  const hasUncategorizedModule = useMemo(() => derived.some((req) => !req.module), [derived])
 
   const hasData = !!project && !loading && !error && !!data
   const hasRequirements = hasData && derived.length > 0
@@ -153,7 +161,12 @@ export function TraceabilityPage() {
             <StatCards stats={stats} />
           </div>
           <div className="px-4">
-            <FilterBar filters={filters} onFiltersChange={setFilters} />
+            <FilterBar
+              filters={filters}
+              onFiltersChange={setFilters}
+              modules={moduleOptions}
+              hasUncategorized={hasUncategorizedModule}
+            />
           </div>
           {view === 'list' ? (
             <ListView requirements={filtered} runStatusChips={filters.runStatusChips} />

@@ -9,9 +9,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { MOCK_MODULES } from './mockModule'
 import {
   ALL_RUN_STATUS_CHIPS,
+  UNCATEGORIZED_MODULE,
   type CoverageFilterValue,
   type RunStatusChip,
   type TraceabilityFilters,
@@ -39,9 +39,13 @@ const RUN_STATUS_DOT_CLASS: Record<RunStatusChip, string> = {
 export function FilterBar({
   filters,
   onFiltersChange,
+  modules,
+  hasUncategorized,
 }: {
   filters: TraceabilityFilters
   onFiltersChange: (next: TraceabilityFilters) => void
+  modules: readonly string[]
+  hasUncategorized: boolean
 }) {
   function toggleChip(chip: RunStatusChip) {
     const next = new Set(filters.runStatusChips)
@@ -71,11 +75,14 @@ export function FilterBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Mọi module</SelectItem>
-            {MOCK_MODULES.map((module) => (
+            {modules.map((module) => (
               <SelectItem key={module} value={module}>
                 {module}
               </SelectItem>
             ))}
+            {hasUncategorized && (
+              <SelectItem value={UNCATEGORIZED_MODULE}>Chưa phân loại</SelectItem>
+            )}
           </SelectContent>
         </Select>
         <Select

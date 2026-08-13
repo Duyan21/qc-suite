@@ -1,10 +1,8 @@
 import type { TraceabilityRequirementItem, TraceabilityStatus } from '@/lib/traceability'
-import { mockModuleFor, type MockModule } from './mockModule'
 
 export type CoverageBucket = 'none' | 'partial' | 'full'
 
 export type DerivedRequirement = TraceabilityRequirementItem & {
-  mockModule: MockModule
   coverageBucket: CoverageBucket
   failCount: number
   isFullyRun: boolean
@@ -22,7 +20,8 @@ export type TraceabilityStats = {
 
 // A requirement counts as "fully run" only once every linked test case has an
 // actual pass/fail outcome — a lingering 'skipped' or 'not_run' still leaves
-// it not fully run, even though 'skipped' counts toward "executed" below.
+// it not fully run. Also used below for the "executed" test case count, so
+// 'skipped' doesn't count as executed either.
 const PASS_FAIL_STATUSES: ReadonlySet<TraceabilityStatus> = new Set(['covered', 'failed'])
 
 export function deriveRequirement(req: TraceabilityRequirementItem): DerivedRequirement {
@@ -34,7 +33,6 @@ export function deriveRequirement(req: TraceabilityRequirementItem): DerivedRequ
 
   return {
     ...req,
-    mockModule: mockModuleFor(req.id),
     coverageBucket,
     failCount,
     isFullyRun,

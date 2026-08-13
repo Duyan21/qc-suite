@@ -1,13 +1,17 @@
 import type { TraceabilityStatus, TraceabilityTestCaseItem } from '@/lib/traceability'
 import type { CoverageBucket, DerivedRequirement } from './deriveTraceability'
-import type { MockModule } from './mockModule'
 
 export type RunStatusChip = 'run' | 'not_run' | 'skip'
 export type CoverageFilterValue = 'all' | CoverageBucket
 
+// Sentinel for "no module set" (backend `module` is nullable free text) —
+// distinct from any real module name so it can be selected as its own
+// filter bucket without colliding with actual data.
+export const UNCATEGORIZED_MODULE = '__uncategorized__'
+
 export type TraceabilityFilters = {
   search: string
-  module: MockModule | 'all'
+  module: string
   coverage: CoverageFilterValue
   runStatusChips: ReadonlySet<RunStatusChip>
 }
@@ -59,7 +63,10 @@ export function filterRequirements(
   filters: TraceabilityFilters,
 ): DerivedRequirement[] {
   return items.filter((req) => {
-    if (filters.module !== 'all' && req.mockModule !== filters.module) return false
+    if (filters.module !== 'all') {
+      const reqModule = req.module ?? UNCATEGORIZED_MODULE
+      if (reqModule !== filters.module) return false
+    }
     if (filters.coverage !== 'all' && req.coverageBucket !== filters.coverage) return false
     if (!matchesSearch(req, filters.search)) return false
     return true
