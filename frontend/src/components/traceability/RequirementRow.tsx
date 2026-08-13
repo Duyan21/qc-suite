@@ -61,7 +61,7 @@ export function RequirementRow({
         type="button"
         onClick={onToggleExpand}
         aria-expanded={expanded}
-        className="flex w-full flex-col gap-2 px-4 py-3 text-left hover:bg-muted/50"
+        className="flex w-full cursor-pointer flex-col gap-2 px-4 py-3 text-left hover:bg-muted/50"
       >
         <div className="flex flex-wrap items-center gap-2">
           {expanded ? (
