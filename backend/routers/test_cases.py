@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -18,7 +18,7 @@ from schemas.test_cases import (
 )
 from services.auth_service import get_current_user
 from services.code_generator import next_code
-from services.embedding_service import trigger_embedding
+from services.embedding_service import embed_and_store
 
 router = APIRouter(
     prefix="/test-cases",
@@ -83,7 +83,11 @@ def list_test_cases(
 
 
 @router.post("", response_model=TestCaseResponse, status_code=status.HTTP_201_CREATED)
-def create_test_case(payload: TestCaseCreate, db: Session = Depends(get_db)):
+def create_test_case(
+    payload: TestCaseCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     requirement = db.get(Requirement, payload.requirement_id)
     if requirement is None:
         raise HTTPException(status_code=400, detail="requirement_id not found")
@@ -102,7 +106,7 @@ def create_test_case(payload: TestCaseCreate, db: Session = Depends(get_db)):
     db.add(tc)
     db.commit()
     db.refresh(tc)
-    trigger_embedding(tc)
+    background_tasks.add_task(embed_and_store, db, tc.id)
     return tc
 
 
@@ -121,7 +125,12 @@ def get_test_case(id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{id}", response_model=TestCaseResponse)
-def update_test_case(id: int, payload: TestCaseUpdate, db: Session = Depends(get_db)):
+def update_test_case(
+    id: int,
+    payload: TestCaseUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     tc = db.get(TestCase, id)
     if tc is None:
         raise HTTPException(status_code=404, detail="TestCase not found")
@@ -146,7 +155,7 @@ def update_test_case(id: int, payload: TestCaseUpdate, db: Session = Depends(get
     db.refresh(tc)
 
     if content_changed:
-        trigger_embedding(tc)
+        background_tasks.add_task(embed_and_store, db, tc.id)
 
     return tc
 
