@@ -110,3 +110,10 @@ def test_search_without_project_id_filters_to_permitted(client, db_session, memb
     response = client.post("/search", json={"query": "login", "threshold": 0.0}, headers=headers)
     assert response.status_code == 200
     # member has read access to `project` via viewer role, so results from it are allowed through
+
+
+def test_search_with_project_id_denies_non_member(client, member_auth_headers, project):
+    response = client.post(
+        "/search", json={"query": "login", "project_id": project.id}, headers=member_auth_headers
+    )
+    assert response.status_code == 403

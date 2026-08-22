@@ -1,12 +1,17 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from models.all_models import Requirement, TestCase, User
+from models.all_models import Project, Requirement, TestCase, User
 from models.base import get_db
 from schemas.search import SearchRequest, SearchResponse, SearchResultItem
 from services.auth_service import get_current_user
 from services.embedding_service import embed
-from services.permissions import PermissionArea, PermissionLevel, permitted_project_ids
+from services.permissions import (
+    PermissionArea,
+    PermissionLevel,
+    check_permission,
+    permitted_project_ids,
+)
 
 router = APIRouter(tags=["search"], dependencies=[Depends(get_current_user)])
 
@@ -17,6 +22,11 @@ def semantic_search(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if payload.project_id is not None:
+        if db.get(Project, payload.project_id) is None:
+            raise HTTPException(status_code=404, detail="project_id not found")
+        check_permission(db, current_user, payload.project_id, PermissionArea.AI_TOOLS, PermissionLevel.READ)
+
     query_vector = embed(payload.query, task_type="RETRIEVAL_QUERY")
     distance = TestCase.embedding.cosine_distance(query_vector)
     score_expr = 1 - distance
