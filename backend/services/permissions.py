@@ -34,8 +34,22 @@ class PermissionLevel(str, Enum):
     def __lt__(self, other: "PermissionLevel") -> bool:
         return self._rank() < other._rank()
 
+    def __le__(self, other: "PermissionLevel") -> bool:
+        return self._rank() <= other._rank()
+
+    def __gt__(self, other: "PermissionLevel") -> bool:
+        return self._rank() > other._rank()
+
     def __ge__(self, other: "PermissionLevel") -> bool:
         return self._rank() >= other._rank()
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, PermissionLevel):
+            return self._rank() == other._rank()
+        return False
+
+    def __ne__(self, other: object) -> bool:
+        return not self.__eq__(other)
 
 
 def get_permission_level(

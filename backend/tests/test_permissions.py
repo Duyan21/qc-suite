@@ -19,6 +19,30 @@ def test_permission_level_ordering():
     assert not (PermissionLevel.READ >= PermissionLevel.EDIT)
 
 
+def test_permission_level_full_comparison_matrix():
+    """Verify all six comparison operators work correctly (rank-based, not lexicographic)."""
+    # Verify > operator (was falling back to str's lexicographic comparison)
+    assert PermissionLevel.EDIT > PermissionLevel.READ
+    assert PermissionLevel.FULL > PermissionLevel.NONE
+    assert not (PermissionLevel.READ > PermissionLevel.EDIT)
+
+    # Verify <= operator (was falling back to str's lexicographic comparison)
+    assert not (PermissionLevel.EDIT <= PermissionLevel.READ)
+    assert PermissionLevel.NONE <= PermissionLevel.READ
+    assert PermissionLevel.EDIT <= PermissionLevel.FULL
+    assert PermissionLevel.EDIT <= PermissionLevel.EDIT
+
+    # Verify == operator (rank-based equality)
+    assert PermissionLevel.EDIT == PermissionLevel.EDIT
+    assert PermissionLevel.NONE == PermissionLevel.NONE
+    assert not (PermissionLevel.EDIT == PermissionLevel.READ)
+
+    # Verify != operator
+    assert PermissionLevel.EDIT != PermissionLevel.READ
+    assert PermissionLevel.FULL != PermissionLevel.NONE
+    assert not (PermissionLevel.EDIT != PermissionLevel.EDIT)
+
+
 def test_superadmin_gets_full_without_membership(db_session, project):
     admin = User(email="super@example.com", hashed_password="x", is_superadmin=True)
     db_session.add(admin)
