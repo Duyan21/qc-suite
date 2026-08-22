@@ -10,6 +10,7 @@ from routers.test_cases import router as test_cases_router
 from routers.defects import router as defects_router
 from routers.traceability import router as traceability_router
 from routers.search import router as search_router
+from routers.roles import router as roles_router
 
 app = FastAPI(title="QC Suite API")
 
@@ -30,6 +31,7 @@ app.include_router(test_cases_router)
 app.include_router(defects_router)
 app.include_router(traceability_router)
 app.include_router(search_router)
+app.include_router(roles_router)
 
 
 @app.get("/health")
