@@ -31,10 +31,12 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
             detail="Email already registered",
         )
 
+    is_first_user = db.query(User).count() == 0
     user = User(
         email=payload.email,
         hashed_password=hash_password(payload.password),
         full_name=payload.full_name,
+        is_superadmin=is_first_user,
     )
     db.add(user)
     db.commit()
@@ -49,6 +51,11 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
+        )
+    if user.status == "Suspended":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is suspended",
         )
 
     return Token(access_token=create_access_token(user.id))
