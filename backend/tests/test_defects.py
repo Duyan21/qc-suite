@@ -1,11 +1,12 @@
 import re
+import uuid
 
 from models.all_models import Project, Requirement, TestCase
 from services.code_generator import next_code
 
 
 def _create_requirement_row(db_session, **overrides):
-    project = Project(name="Home Lending", description="d")
+    project = Project(name="Home Lending", description="d", key=f"DEF{uuid.uuid4().hex[:6].upper()}")
     db_session.add(project)
     db_session.commit()
     db_session.refresh(project)
@@ -137,7 +138,7 @@ def test_list_defects_filters_by_severity_and_status(client, auth_headers, db_se
 
 
 def test_list_defects_scoped_by_project(client, auth_headers, db_session, project):
-    other_project = Project(name="Other Project", description="d")
+    other_project = Project(name="Other Project", description="d", key="OP1")
     db_session.add(other_project)
     db_session.commit()
     db_session.refresh(other_project)
@@ -339,7 +340,7 @@ def test_defects_require_auth(client):
 
 
 def test_defect_stats_counts_by_status_and_severity_scoped_by_project(client, auth_headers, db_session, project):
-    other_project = Project(name="Other Project", description="d")
+    other_project = Project(name="Other Project", description="d", key="OP2")
     db_session.add(other_project)
     db_session.commit()
     db_session.refresh(other_project)

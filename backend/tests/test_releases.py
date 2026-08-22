@@ -23,7 +23,7 @@ def test_create_release_rejects_unknown_project(client, auth_headers):
 def test_list_releases_by_project(client, auth_headers, project, db_session):
     from models.all_models import Project
 
-    other_project = Project(name="Auto Loans", description="d")
+    other_project = Project(name="Auto Loans", description="d", key="AL1")
     db_session.add(other_project)
     db_session.commit()
     db_session.refresh(other_project)

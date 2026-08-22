@@ -1,11 +1,12 @@
 import re
+import uuid
 
 from models.all_models import Project, Release, Requirement
 from services.code_generator import next_code
 
 
 def _create_requirement_row(db_session, **overrides):
-    project = Project(name="Home Lending", description="d")
+    project = Project(name="Home Lending", description="d", key=f"TC{uuid.uuid4().hex[:6].upper()}")
     db_session.add(project)
     db_session.commit()
     db_session.refresh(project)
@@ -28,7 +29,7 @@ def _create_requirement_row(db_session, **overrides):
 
 
 def _create_release_row(db_session):
-    project = Project(name="Home Lending", description="d")
+    project = Project(name="Home Lending", description="d", key=f"REL{uuid.uuid4().hex[:6].upper()}")
     db_session.add(project)
     db_session.commit()
     db_session.refresh(project)

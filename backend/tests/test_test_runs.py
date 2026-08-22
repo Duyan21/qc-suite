@@ -1,8 +1,10 @@
+import uuid
+
 from models.all_models import Project, Release
 
 
 def _create_release(db_session):
-    project = Project(name="Home Lending", description="d")
+    project = Project(name="Home Lending", description="d", key=f"TRN{uuid.uuid4().hex[:6].upper()}")
     db_session.add(project)
     db_session.commit()
     db_session.refresh(project)

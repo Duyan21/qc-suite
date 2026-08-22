@@ -49,7 +49,7 @@ def test_list_requirements_returns_only_current_versions(client, auth_headers, p
 def test_list_requirements_scoped_by_project(client, auth_headers, project, db_session):
     from models.all_models import Project
 
-    other_project = Project(name="Other Project", description="d")
+    other_project = Project(name="Other Project", description="d", key="OP3")
     db_session.add(other_project)
     db_session.commit()
     db_session.refresh(other_project)
