@@ -6,6 +6,7 @@ from models.base import get_db
 from schemas.auth import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
+    ResetPasswordRequest,
     Token,
     UserLogin,
     UserRegister,
@@ -16,8 +17,10 @@ from services.auth_service import (
     create_reset_token,
     get_current_user,
     hash_password,
+    reset_password as reset_password_service,
     verify_password,
 )
+from services.email_service import send_reset_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -54,18 +57,27 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
     return Token(access_token=create_access_token(user.id))
 
 
+GENERIC_FORGOT_PASSWORD_MESSAGE = (
+    "Nếu email tồn tại trong hệ thống, bạn sẽ nhận được link đặt lại mật khẩu trong ít phút."
+)
+
+
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+    if user is not None:
+        reset_token = create_reset_token(user.id)
+        send_reset_email(user.email, reset_token)
 
-    reset_token = create_reset_token(user.id)
-    print(f"[password-reset] email={user.email} token={reset_token}")
-    return ForgotPasswordResponse(reset_token=reset_token, expires_in_minutes=30)
+    # Always return the same generic message regardless of whether the
+    # email exists — avoids leaking which emails are registered.
+    return ForgotPasswordResponse(message=GENERIC_FORGOT_PASSWORD_MESSAGE)
+
+
+@router.post("/reset-password", response_model=UserResponse)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = reset_password_service(payload.token, payload.new_password, db)
+    return user
 
 
 @router.get("/me", response_model=UserResponse)

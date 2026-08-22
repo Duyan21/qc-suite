@@ -47,9 +47,17 @@ export async function requestPasswordReset(email: string): Promise<void> {
       body: { email },
     })
   } catch (err) {
-    if (err instanceof Error && err.message === 'User not found') {
-      return
-    }
+    throw toVietnameseError(err)
+  }
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  try {
+    await apiFetch('/auth/reset-password', {
+      method: 'POST',
+      body: { token, new_password: newPassword },
+    })
+  } catch (err) {
     throw toVietnameseError(err)
   }
 }
