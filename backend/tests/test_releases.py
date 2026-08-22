@@ -47,3 +47,12 @@ def test_list_releases_rejects_unknown_project(client, auth_headers):
 def test_releases_require_auth(client, project):
     response = client.get(f"/releases?project_id={project.id}")
     assert response.status_code == 401
+
+
+def test_create_release_requires_edit_on_test_runs(client, member_auth_headers, project):
+    response = client.post(
+        "/releases",
+        json={"project_id": project.id, "version_name": "v1.0.0"},
+        headers=member_auth_headers,
+    )
+    assert response.status_code == 403
