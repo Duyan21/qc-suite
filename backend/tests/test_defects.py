@@ -382,3 +382,65 @@ def test_defect_stats_rejects_unknown_project(client, auth_headers):
 def test_defect_stats_requires_project_id(client, auth_headers):
     response = client.get("/defects/stats", headers=auth_headers)
     assert response.status_code == 422
+
+
+def test_list_defects_denies_without_membership(client, member_auth_headers, project):
+    response = client.get(f"/defects?project_id={project.id}", headers=member_auth_headers)
+    assert response.status_code == 403
+
+
+def test_create_defect_requires_edit(client, db_session, member_user, project, role_by_key):
+    from models.all_models import ProjectMember
+    viewer = role_by_key("viewer")
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=viewer.id))
+    db_session.commit()
+
+    from services.auth_service import create_access_token
+    headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
+
+    response = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=headers,
+    )
+    assert response.status_code == 403
+
+
+def test_delete_defect_requires_full_not_just_edit(client, db_session, member_user, project, role_by_key, auth_headers):
+    from models.all_models import ProjectMember
+
+    created = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    ).json()
+
+    tester = role_by_key("tester")  # Edit, not Full, on defects
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=tester.id))
+    db_session.commit()
+
+    from services.auth_service import create_access_token
+    headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
+
+    response = client.delete(f"/defects/{created['id']}", headers=headers)
+    assert response.status_code == 403
+
+
+def test_delete_defect_succeeds_with_full(client, db_session, member_user, project, role_by_key, auth_headers):
+    from models.all_models import ProjectMember
+
+    created = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    ).json()
+
+    qa_lead = role_by_key("qa_lead")  # Full on defects
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=qa_lead.id))
+    db_session.commit()
+
+    from services.auth_service import create_access_token
+    headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
+
+    response = client.delete(f"/defects/{created['id']}", headers=headers)
+    assert response.status_code == 204
