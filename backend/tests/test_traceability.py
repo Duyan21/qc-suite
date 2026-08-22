@@ -233,3 +233,8 @@ def test_traceability_new_version_does_not_inherit_old_version_coverage(client, 
     assert item["is_uncovered"] is True
     assert item["coverage_percent"] == 0.0
     assert item["test_cases"] == []
+
+
+def test_traceability_requires_read_on_requirements(client, member_auth_headers, project):
+    response = client.get(f"/traceability?project_id={project.id}", headers=member_auth_headers)
+    assert response.status_code == 403
