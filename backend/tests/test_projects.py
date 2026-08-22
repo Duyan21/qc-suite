@@ -158,6 +158,19 @@ def test_remove_member(client, auth_headers, project, member_user, role_by_key, 
     assert not any(m["user_id"] == member_user.id for m in listing)
 
 
+def test_invite_member_rejects_already_existing_member(client, auth_headers, project, member_user, role_by_key, db_session):
+    tester = role_by_key("tester")
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=tester.id))
+    db_session.commit()
+
+    response = client.post(
+        f"/projects/{project.id}/members",
+        json={"email": member_user.email, "role_key": "viewer"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
 def test_member_actions_require_edit_on_members_roles(client, db_session, project, member_user, role_by_key):
     tester = role_by_key("tester")  # tester has None on members_roles per the seeded matrix
     db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=tester.id))
