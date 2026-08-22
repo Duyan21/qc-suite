@@ -236,3 +236,52 @@ def test_list_requirements_excludes_deprecated_by_default(client, auth_headers, 
     explicit_data = explicit.json()
     assert explicit_data["total"] == 1
     assert explicit_data["items"][0]["id"] == deprecated["id"]
+
+
+def test_list_requirements_denies_without_membership(client, member_auth_headers, project):
+    response = client.get(f"/requirements?project_id={project.id}", headers=member_auth_headers)
+    assert response.status_code == 403
+
+
+def test_create_requirement_denies_without_edit(client, db_session, member_user, project, role_by_key):
+    from models.all_models import ProjectMember
+    viewer = role_by_key("viewer")
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=viewer.id))
+    db_session.commit()
+
+    from services.auth_service import create_access_token
+    headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
+
+    response = client.post(
+        "/requirements",
+        json={"title": "T", "description": "d", "project_id": project.id},
+        headers=headers,
+    )
+    assert response.status_code == 403
+
+
+def test_update_requirement_checks_permission_via_row_lookup(client, db_session, member_user, project, role_by_key):
+    from models.all_models import ProjectMember, Requirement
+    from services.code_generator import next_code
+
+    req = Requirement(
+        project_id=project.id, req_id=next_code(db_session, Requirement, "req_id", "REQ"),
+        version=1, title="T", description="d", status="Active", is_current=True,
+    )
+    db_session.add(req)
+    db_session.commit()
+    db_session.refresh(req)
+
+    developer = role_by_key("developer")  # Edit on requirements per the seeded matrix
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=developer.id))
+    db_session.commit()
+
+    from services.auth_service import create_access_token
+    headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
+
+    response = client.put(
+        f"/requirements/{req.id}",
+        json={"title": "Updated", "description": "d2", "status": "Active", "change_note": "note"},
+        headers=headers,
+    )
+    assert response.status_code == 200
