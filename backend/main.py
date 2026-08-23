@@ -17,6 +17,7 @@ from routers.traceability import router as traceability_router
 from routers.search import router as search_router
 from routers.roles import router as roles_router
 from routers.users import router as users_router
+from routers.modules import router as modules_router
 
 
 def ensure_superadmin() -> None:
@@ -68,6 +69,7 @@ app.include_router(traceability_router)
 app.include_router(search_router)
 app.include_router(roles_router)
 app.include_router(users_router)
+app.include_router(modules_router)
 
 
 @app.get("/health")
