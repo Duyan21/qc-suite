@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.all_models import Defect, Module, Project, Requirement, TestCase, User
@@ -107,7 +108,11 @@ def create_module(
 
     module = Module(project_id=id, name=name)
     db.add(module)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="A module with this name already exists")
     db.refresh(module)
     return module
 
@@ -125,7 +130,11 @@ def update_module(
     module = _get_module_or_404(db, id, module_id)
     module.name = _validate_name(db, id, payload.name, exclude_module_id=module.id)
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="A module with this name already exists")
     db.refresh(module)
     return module
 
@@ -150,12 +159,6 @@ def delete_module(
                 "Close or reassign them first."
             ),
         )
-
-    # Nullify module_id on all non-active requirements before deleting
-    db.query(Requirement).filter(
-        Requirement.module_id == module.id,
-        ~Requirement.status.in_(ACTIVE_REQUIREMENT_STATUSES)
-    ).update({Requirement.module_id: None})
 
     db.delete(module)
     db.commit()

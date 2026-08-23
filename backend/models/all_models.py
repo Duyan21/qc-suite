@@ -104,7 +104,7 @@ class Requirement(Base):
     version = Column(Integer, nullable=False)
     title = Column(Text, nullable=False)
     description = Column(Text, nullable=False)
-    module_id = Column(Integer, ForeignKey("modules.id"), nullable=True)
+    module_id = Column(Integer, ForeignKey("modules.id", ondelete="SET NULL"), nullable=True)
     status = Column(String(20), default="Draft")
     is_current = Column(Boolean, default=False)
     change_note = Column(Text)
