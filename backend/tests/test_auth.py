@@ -71,3 +71,19 @@ def test_suspended_user_cannot_login(client, db_session):
         "/auth/login", json={"email": "suspended@example.com", "password": "password123"}
     )
     assert response.status_code == 403
+
+
+def test_invited_user_with_empty_password_gets_401_not_500(client, db_session):
+    """invite_member creates a User with hashed_password="" (no accept-invite
+    flow yet). bcrypt.checkpw(..., b"") raises ValueError -> unhandled 500 on
+    the public login endpoint. Must be a clean 401 instead."""
+    user = User(email="invited.no.password@example.com", hashed_password="", status="Invited")
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "invited.no.password@example.com", "password": "anything-at-all"},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid email or password"

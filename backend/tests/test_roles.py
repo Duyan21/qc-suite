@@ -36,3 +36,28 @@ def test_update_permission_matrix_as_superadmin(client, auth_headers):
     matrix = client.get("/permissions/matrix", headers=auth_headers).json()
     cell = next(c for c in matrix["cells"] if c["role_key"] == "viewer" and c["area"] == "requirements")
     assert cell["level"] == "edit"
+
+
+def test_update_permission_matrix_rejects_invalid_level(client, auth_headers):
+    """A bogus level used to be written straight into role_permissions, making
+    PermissionLevel(...) raise ValueError -> 500 on every later request from
+    every member of that role. Must be rejected with a 422 at the edge."""
+    response = client.put(
+        "/permissions/matrix",
+        json={"cells": [{"role_key": "viewer", "area": "requirements", "level": "banana"}]},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+    # ...and nothing was persisted.
+    matrix = client.get("/permissions/matrix", headers=auth_headers).json()
+    assert all(c["level"] in {"none", "read", "edit", "full"} for c in matrix["cells"])
+
+
+def test_update_permission_matrix_rejects_invalid_area(client, auth_headers):
+    response = client.put(
+        "/permissions/matrix",
+        json={"cells": [{"role_key": "viewer", "area": "not_an_area", "level": "read"}]},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422

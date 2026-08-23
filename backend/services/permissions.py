@@ -51,6 +51,10 @@ class PermissionLevel(str, Enum):
     def __ne__(self, other: object) -> bool:
         return not self.__eq__(other)
 
+    # Defining __eq__ sets __hash__ = None implicitly, which would make members
+    # unusable as set entries / dict keys. Restore the str mixin's hash.
+    __hash__ = str.__hash__
+
 
 def get_permission_level(
     db: Session, user: User, project_id: int, area: PermissionArea
@@ -75,6 +79,21 @@ def get_permission_level(
         return PermissionLevel.NONE
 
     return PermissionLevel(role_permission.level)
+
+
+def is_project_member(db: Session, user: User, project_id: int) -> bool:
+    """Membership-only gate, deliberately NOT routed through the permission
+    matrix: `viewer` has "none" on both project_settings and members_roles, so
+    gating basic project/member reads on those areas would hide a viewer's own
+    project from them (and break the global project switcher)."""
+    if user.is_superadmin:
+        return True
+    return (
+        db.query(ProjectMember)
+        .filter(ProjectMember.project_id == project_id, ProjectMember.user_id == user.id)
+        .first()
+        is not None
+    )
 
 
 def check_permission(

@@ -56,3 +56,19 @@ def test_create_release_requires_edit_on_test_runs(client, member_auth_headers, 
         headers=member_auth_headers,
     )
     assert response.status_code == 403
+
+
+def test_list_releases_denies_non_member(client, db_session, project, member_user, role_by_key):
+    """GET /releases?project_id= previously had no permission check at all —
+    any authenticated stranger could enumerate a project's releases."""
+    from models.all_models import ProjectMember
+    from services.auth_service import create_access_token
+
+    headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
+    assert client.get(f"/releases?project_id={project.id}", headers=headers).status_code == 403
+
+    viewer = role_by_key("viewer")
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=viewer.id))
+    db_session.commit()
+
+    assert client.get(f"/releases?project_id={project.id}", headers=headers).status_code == 200

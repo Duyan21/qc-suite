@@ -74,6 +74,7 @@ def load_json(name):
 def seed_project(db):
     project = Project(
         name=PROJECT_NAME,
+        key="HLS",
         description=(
             "End-to-end mortgage lifecycle platform: application, KYC, "
             "income verification, property valuation, credit assessment, "

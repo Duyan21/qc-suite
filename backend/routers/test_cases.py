@@ -130,6 +130,10 @@ def get_test_case(id: int, db: Session = Depends(get_db), current_user: User = D
     requirement = db.get(Requirement, tc.requirement_id) if tc.requirement_id else None
     if requirement is not None:
         check_permission(db, current_user, requirement.project_id, PermissionArea.TEST_CASES, PermissionLevel.READ)
+    elif not current_user.is_superadmin:
+        raise HTTPException(
+            status_code=403, detail="Cannot access an orphan test case without superadmin access"
+        )
     response = TestCaseDetailResponse.model_validate(tc)
     response.requirement = (
         RequirementSummary.model_validate(requirement) if requirement else None
@@ -148,6 +152,20 @@ def update_test_case(
     tc = db.get(TestCase, id)
     if tc is None:
         raise HTTPException(status_code=404, detail="TestCase not found")
+
+    # Gate on the test case's CURRENT project too, not just the one it is being
+    # moved into — otherwise a user with Edit on project B could rewrite (and
+    # read back) a test case belonging to project A simply by re-pointing it.
+    current_requirement = db.get(Requirement, tc.requirement_id) if tc.requirement_id else None
+    if current_requirement is not None:
+        check_permission(
+            db, current_user, current_requirement.project_id, PermissionArea.TEST_CASES, PermissionLevel.EDIT
+        )
+    elif not current_user.is_superadmin:
+        raise HTTPException(
+            status_code=403, detail="Cannot access an orphan test case without superadmin access"
+        )
+
     requirement = db.get(Requirement, payload.requirement_id)
     if requirement is None:
         raise HTTPException(status_code=400, detail="requirement_id not found")
@@ -183,6 +201,10 @@ def delete_test_case(id: int, db: Session = Depends(get_db), current_user: User 
     requirement = db.get(Requirement, tc.requirement_id) if tc.requirement_id else None
     if requirement is not None:
         check_permission(db, current_user, requirement.project_id, PermissionArea.TEST_CASES, PermissionLevel.EDIT)
+    elif not current_user.is_superadmin:
+        raise HTTPException(
+            status_code=403, detail="Cannot access an orphan test case without superadmin access"
+        )
     tc.status = "Deprecated"
     db.commit()
     db.refresh(tc)
@@ -240,6 +262,10 @@ def get_test_case_results(id: int, db: Session = Depends(get_db), current_user: 
     requirement = db.get(Requirement, tc.requirement_id) if tc.requirement_id else None
     if requirement is not None:
         check_permission(db, current_user, requirement.project_id, PermissionArea.TEST_RUNS, PermissionLevel.READ)
+    elif not current_user.is_superadmin:
+        raise HTTPException(
+            status_code=403, detail="Cannot access an orphan test case without superadmin access"
+        )
 
     rows = (
         db.query(TestRunResult, TestRun)

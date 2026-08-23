@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/lib/toast'
+import { getCurrentUser, type CurrentUser } from '@/lib/auth'
 import { listProjects, type Project } from '@/lib/projects'
 import { listRoles, type Role } from '@/lib/roles'
 import { listMembers, inviteMember, updateMember, removeMember, type Member } from '@/lib/members'
@@ -53,7 +54,17 @@ export function UsersAccessTab() {
   const [roleFilter, setRoleFilter] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviting, setInviting] = useState(false)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const requestIdRef = useRef(0)
+
+  // Simplification: the backend allows both superadmins and anyone with Edit on
+  // members_roles for this project, but there's no endpoint exposing the
+  // viewer's own per-project level yet, so gate the row actions on superadmin.
+  const canManageMembers = currentUser?.is_superadmin === true
+
+  useEffect(() => {
+    getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null))
+  }, [])
 
   useEffect(() => {
     Promise.all([listProjects(), listRoles()])
@@ -110,7 +121,10 @@ export function UsersAccessTab() {
   function handleInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (projectId === null) return
-    const formData = new FormData(event.currentTarget)
+    // Capture the form element synchronously — React nulls event.currentTarget
+    // once this handler returns, so reading it inside .then() would throw.
+    const formEl = event.currentTarget
+    const formData = new FormData(formEl)
     const email = String(formData.get('email') ?? '').trim()
     const roleKey = String(formData.get('role_key') ?? roles[0]?.key ?? '')
     if (!email || !roleKey) return
@@ -120,7 +134,7 @@ export function UsersAccessTab() {
       .then((member) => {
         setMembers((prev) => [...prev, member])
         setInviteOpen(false)
-        event.currentTarget.reset()
+        formEl.reset()
         toast.success(`Đã mời ${member.email}`)
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Không thể mời thành viên'))
@@ -249,8 +263,10 @@ export function UsersAccessTab() {
                     </td>
                     <td className="px-4 py-2.5">
                       <select
-                        className="h-7 rounded-md border border-input bg-transparent px-2 text-xs"
+                        className="h-7 rounded-md border border-input bg-transparent px-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                         value={member.role_key}
+                        disabled={!canManageMembers}
+                        title={canManageMembers ? undefined : 'Bạn không có quyền quản lý thành viên'}
                         onChange={(e) => handleRoleChange(member.user_id, e.target.value)}
                       >
                         {roles.map((r) => (
@@ -264,10 +280,22 @@ export function UsersAccessTab() {
                     <td className="px-4 py-2.5 text-muted-foreground">{formatDate(member.joined_at)}</td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => handleStatusToggle(member)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!canManageMembers}
+                          title={canManageMembers ? undefined : 'Bạn không có quyền quản lý thành viên'}
+                          onClick={() => handleStatusToggle(member)}
+                        >
                           {member.status === 'Suspended' ? 'Reactivate' : 'Suspend'}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleRemove(member.user_id)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!canManageMembers}
+                          title={canManageMembers ? undefined : 'Bạn không có quyền quản lý thành viên'}
+                          onClick={() => handleRemove(member.user_id)}
+                        >
                           Remove
                         </Button>
                       </div>

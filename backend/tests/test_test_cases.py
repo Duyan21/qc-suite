@@ -333,3 +333,120 @@ def _superadmin_headers(db_session):
         db_session.commit()
         db_session.refresh(admin)
     return {"Authorization": f"Bearer {create_access_token(admin.id)}"}
+
+
+# --- Final whole-branch review fixes -------------------------------------
+
+
+def _make_orphan(db_session):
+    from models.all_models import TestCase
+
+    orphan = TestCase(
+        code=next_code(db_session, TestCase, "code", "TC"),
+        title="Orphan test case",
+        expected_result="n/a",
+        priority="Low",
+        status="Draft",
+        requirement_id=None,
+    )
+    db_session.add(orphan)
+    db_session.commit()
+    db_session.refresh(orphan)
+    return orphan
+
+
+def test_orphan_test_case_read_denied_without_superadmin(client, db_session, member_auth_headers):
+    """A test case with requirement_id=None has no project to derive permission
+    from — that used to skip the check entirely (fail open)."""
+    orphan = _make_orphan(db_session)
+    assert client.get(f"/test-cases/{orphan.id}", headers=member_auth_headers).status_code == 403
+    # ...but a superadmin can still reach it.
+    assert client.get(
+        f"/test-cases/{orphan.id}", headers=_superadmin_headers(db_session)
+    ).status_code == 200
+
+
+def test_orphan_test_case_delete_denied_without_superadmin(client, db_session, member_auth_headers):
+    orphan = _make_orphan(db_session)
+    response = client.delete(f"/test-cases/{orphan.id}", headers=member_auth_headers)
+    assert response.status_code == 403
+    db_session.refresh(orphan)
+    assert orphan.status == "Draft"  # not soft-deleted
+
+
+def test_orphan_test_case_results_denied_without_superadmin(client, db_session, member_auth_headers):
+    orphan = _make_orphan(db_session)
+    assert client.get(
+        f"/test-cases/{orphan.id}/results", headers=member_auth_headers
+    ).status_code == 403
+    assert client.get(
+        f"/test-cases/{orphan.id}/results", headers=_superadmin_headers(db_session)
+    ).status_code == 200
+
+
+def test_update_test_case_denies_cross_project_takeover(
+    client, db_session, member_user, role_by_key
+):
+    """Edit on project B must not let a user rewrite a test case that currently
+    lives in project A by re-pointing it at a project-B requirement."""
+    from models.all_models import ProjectMember
+    from services.auth_service import create_access_token
+
+    admin_headers = _superadmin_headers(db_session)
+    req_a = _create_requirement_row(db_session)               # project A
+    req_b = _create_requirement_row(db_session)               # project B
+    tc = _create_test_case(client, admin_headers, req_a.id, title="Belongs to project A").json()
+
+    tester = role_by_key("tester")  # Edit on test_cases
+    db_session.add(ProjectMember(project_id=req_b.project_id, user_id=member_user.id, role_id=tester.id))
+    db_session.commit()
+
+    headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
+    body = {
+        "title": "Hijacked",
+        "preconditions": None,
+        "steps": "s",
+        "expected_result": "e",
+        "priority": "High",
+        "status": "Active",
+        "requirement_id": req_b.id,
+    }
+    response = client.put(f"/test-cases/{tc['id']}", json=body, headers=headers)
+    assert response.status_code == 403
+
+    from models.all_models import TestCase
+    db_session.expire_all()
+    unchanged = db_session.get(TestCase, tc["id"])
+    assert unchanged.title == "Belongs to project A"
+    assert unchanged.requirement_id == req_a.id
+
+
+def test_update_test_case_allowed_when_member_of_both_projects(
+    client, db_session, member_user, role_by_key
+):
+    from models.all_models import ProjectMember
+    from services.auth_service import create_access_token
+
+    admin_headers = _superadmin_headers(db_session)
+    req_a = _create_requirement_row(db_session)
+    req_b = _create_requirement_row(db_session)
+    tc = _create_test_case(client, admin_headers, req_a.id).json()
+
+    tester = role_by_key("tester")
+    db_session.add(ProjectMember(project_id=req_a.project_id, user_id=member_user.id, role_id=tester.id))
+    db_session.add(ProjectMember(project_id=req_b.project_id, user_id=member_user.id, role_id=tester.id))
+    db_session.commit()
+
+    headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
+    body = {
+        "title": "Moved legitimately",
+        "preconditions": None,
+        "steps": "s",
+        "expected_result": "e",
+        "priority": "High",
+        "status": "Active",
+        "requirement_id": req_b.id,
+    }
+    response = client.put(f"/test-cases/{tc['id']}", json=body, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["requirement_id"] == req_b.id

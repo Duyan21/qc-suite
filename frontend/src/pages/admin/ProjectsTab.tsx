@@ -103,7 +103,10 @@ export function ProjectsTab() {
 
   function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const formData = new FormData(event.currentTarget)
+    // Capture the form element synchronously — React nulls event.currentTarget
+    // once this handler returns, so reading it inside .then() would throw.
+    const formEl = event.currentTarget
+    const formData = new FormData(formEl)
     const name = String(formData.get('name') ?? '').trim()
     const description = String(formData.get('description') ?? '').trim()
     if (!name) return
@@ -114,7 +117,7 @@ export function ProjectsTab() {
         setProjects((prev) => [...prev, project])
         setSelectedId(project.id)
         setCreateOpen(false)
-        event.currentTarget.reset()
+        formEl.reset()
         toast.success(`Đã tạo project "${project.name}"`)
       })
       .catch((err) => {

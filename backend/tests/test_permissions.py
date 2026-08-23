@@ -99,3 +99,28 @@ def test_permitted_project_ids_filters_by_membership(db_session, project, member
 
     result = permitted_project_ids(db_session, member_user, PermissionArea.TEST_CASES, PermissionLevel.READ)
     assert result == {project.id}
+
+
+def test_permission_level_is_hashable():
+    """A custom __eq__ without __hash__ sets __hash__ = None, which would make
+    PermissionLevel unusable in sets and as dict keys."""
+    assert hash(PermissionLevel.EDIT) == hash("edit")
+    assert {PermissionLevel.READ, PermissionLevel.EDIT, PermissionLevel.READ} == {
+        PermissionLevel.READ,
+        PermissionLevel.EDIT,
+    }
+    assert {PermissionLevel.FULL: "ok"}[PermissionLevel.FULL] == "ok"
+
+
+def test_is_project_member(db_session, project, member_user, role_by_key, test_user):
+    from services.permissions import is_project_member
+
+    assert is_project_member(db_session, member_user, project.id) is False
+    assert is_project_member(db_session, test_user, project.id) is True  # superadmin
+
+    viewer = role_by_key("viewer")
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=viewer.id))
+    db_session.commit()
+
+    # Viewer has "none" on project_settings/members_roles yet is still a member.
+    assert is_project_member(db_session, member_user, project.id) is True

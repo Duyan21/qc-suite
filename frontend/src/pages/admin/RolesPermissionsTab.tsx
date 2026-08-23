@@ -47,6 +47,19 @@ export function RolesPermissionsTab() {
     return map
   }, [matrix])
 
+  // The role cards used to render an empty "người dùng" label with no number.
+  // Real cross-project member counts aren't available here (this tab only
+  // fetches the matrix), so show what the fetched data actually supports:
+  // how many of the 8 permission areas the role is granted above "none".
+  const grantedAreaCountByRole = useMemo(() => {
+    const counts = new Map<string, number>()
+    matrix?.roles.forEach((role) => counts.set(role.key, 0))
+    matrix?.cells.forEach((c) => {
+      if (c.level !== 'none') counts.set(c.role_key, (counts.get(c.role_key) ?? 0) + 1)
+    })
+    return counts
+  }, [matrix])
+
   function handleCellClick(roleKey: string, area: string) {
     if (!matrix || !currentUser?.is_superadmin) return
     const current = cellByRoleArea.get(`${roleKey}:${area}`)?.level ?? 'none'
@@ -80,7 +93,9 @@ export function RolesPermissionsTab() {
           <Card key={role.key}>
             <CardContent className="p-4">
               <div className="text-sm font-medium">{role.name}</div>
-              <div className="text-xs text-muted-foreground">người dùng</div>
+              <div className="text-xs text-muted-foreground">
+                {grantedAreaCountByRole.get(role.key) ?? 0}/{AREAS.length} nhóm quyền được cấp
+              </div>
             </CardContent>
           </Card>
         ))}
