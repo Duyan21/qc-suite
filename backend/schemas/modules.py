@@ -1,14 +1,14 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ModuleCreate(BaseModel):
-    name: str
+    name: str = Field(max_length=100)
 
 
 class ModuleUpdate(BaseModel):
-    name: str
+    name: str = Field(max_length=100)
 
 
 class ModuleResponse(BaseModel):

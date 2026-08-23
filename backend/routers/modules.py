@@ -58,7 +58,11 @@ def _count_active_connections(db: Session, module: Module) -> int:
 
     active_req_count = (
         db.query(Requirement)
-        .filter(Requirement.module_id == module.id, Requirement.status.in_(ACTIVE_REQUIREMENT_STATUSES))
+        .filter(
+            Requirement.module_id == module.id,
+            Requirement.is_current == True,
+            Requirement.status.in_(ACTIVE_REQUIREMENT_STATUSES),
+        )
         .count()
         if req_ids
         else 0

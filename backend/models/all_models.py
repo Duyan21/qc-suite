@@ -1,8 +1,7 @@
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean,
-    ForeignKey, TIMESTAMP, UniqueConstraint, func
+    ForeignKey, TIMESTAMP, UniqueConstraint, Index, func
 )
-from sqlalchemy.dialects.postgresql import ARRAY
 from pgvector.sqlalchemy import Vector
 from .base import Base
 
@@ -82,14 +81,15 @@ class Release(Base):
 
 class Module(Base):
     __tablename__ = "modules"
-    __table_args__ = (
-        UniqueConstraint("project_id", "name", name="uq_modules_project_name"),
-    )
 
     id = Column(Integer, primary_key=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     name = Column(String(100), nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
+
+    __table_args__ = (
+        Index("uq_modules_project_lower_name", "project_id", func.lower(name), unique=True),
+    )
 
 
 class Requirement(Base):

@@ -202,3 +202,74 @@ def test_delete_not_blocked_once_everything_closed(client, auth_headers, project
 
     response = client.delete(f"/projects/{project.id}/modules/{module.id}", headers=auth_headers)
     assert response.status_code == 204
+
+
+def test_create_module_rejects_over_length_name(client, auth_headers, project):
+    response = client.post(
+        f"/projects/{project.id}/modules", json={"name": "x" * 101}, headers=auth_headers
+    )
+    assert response.status_code == 422
+
+
+def test_delete_not_blocked_by_superseded_requirement_version(client, auth_headers, project, db_session):
+    """A module is blocked by an Active requirement version. Once that requirement is
+    soft-deleted via the real DELETE endpoint (which flips is_current on the old row and
+    inserts a new Deprecated version row, per the append-only model), the old row's
+    "Active" status must no longer count as blocking -- only the is_current row should
+    ever be counted."""
+    module = Module(project_id=project.id, name="SupersededBlock")
+    db_session.add(module)
+    db_session.commit()
+    db_session.refresh(module)
+    req = _create_requirement(db_session, project, module, status="Active")
+
+    # Sanity: the module is blocked while the requirement is current and Active.
+    blocked = client.delete(f"/projects/{project.id}/modules/{module.id}", headers=auth_headers)
+    assert blocked.status_code == 400
+
+    # Soft-delete the requirement through the real endpoint: this flips is_current on
+    # the old ("Active") row and inserts a new is_current=True, status=Deprecated row.
+    delete_req = client.delete(f"/requirements/{req.id}", headers=auth_headers)
+    assert delete_req.status_code == 200
+
+    response = client.delete(f"/projects/{project.id}/modules/{module.id}", headers=auth_headers)
+    assert response.status_code == 204
+
+
+def test_delete_not_blocked_after_requirement_reassigned_to_other_module(
+    client, auth_headers, project, db_session
+):
+    """A module is blocked by an Active requirement. Reassigning that requirement to a
+    different module via the real PUT endpoint (which also flips is_current on the old
+    row and inserts a new current row pointing at the new module) must free the
+    *original* module for deletion -- the old, no-longer-current row must not keep
+    counting against it."""
+    original_module = Module(project_id=project.id, name="OriginalHome")
+    other_module = Module(project_id=project.id, name="NewHome")
+    db_session.add_all([original_module, other_module])
+    db_session.commit()
+    db_session.refresh(original_module)
+    db_session.refresh(other_module)
+
+    req = _create_requirement(db_session, project, original_module, status="Active")
+
+    # Sanity: blocked while the current version still points at original_module.
+    blocked = client.delete(f"/projects/{project.id}/modules/{original_module.id}", headers=auth_headers)
+    assert blocked.status_code == 400
+
+    update_req = client.put(
+        f"/requirements/{req.id}",
+        json={
+            "title": req.title,
+            "description": req.description,
+            "module_id": other_module.id,
+            "status": "Active",
+            "change_note": "Reassign to other module",
+        },
+        headers=auth_headers,
+    )
+    assert update_req.status_code == 200
+    assert update_req.json()["module_id"] == other_module.id
+
+    response = client.delete(f"/projects/{project.id}/modules/{original_module.id}", headers=auth_headers)
+    assert response.status_code == 204
