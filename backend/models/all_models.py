@@ -2,6 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, Text, Boolean,
     ForeignKey, TIMESTAMP, UniqueConstraint, func
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from pgvector.sqlalchemy import Vector
 from .base import Base
 
@@ -14,6 +15,9 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255))
     is_active = Column(Boolean, default=True)
+    status = Column(String(20), default="Active")
+    is_superadmin = Column(Boolean, default=False)
+    can_create_projects = Column(Boolean, default=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 
@@ -23,6 +27,49 @@ class Project(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
+    key = Column(String(20), unique=True, nullable=False)
+    lead_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    modules = Column(ARRAY(String), default=list)
+    status = Column(String(20), default="Active")
+    require_requirement_link = Column(Boolean, default=True)
+    auto_resolve_days = Column(Integer, nullable=True)
+    ai_impact_suggestions = Column(Boolean, default=True)
+    slack_alerts_enabled = Column(Boolean, default=False)
+    retention_days = Column(Integer, default=365)
+    default_severity = Column(String(20), default="Medium")
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(20), unique=True, nullable=False)
+    name = Column(String(50), nullable=False)
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+    __table_args__ = (
+        UniqueConstraint("role_id", "area", name="uq_role_permissions_role_area"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
+    area = Column(String(30), nullable=False)
+    level = Column(String(10), nullable=False)
+
+
+class ProjectMember(Base):
+    __tablename__ = "project_members"
+    __table_args__ = (
+        UniqueConstraint("project_id", "user_id", name="uq_project_members_project_user"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 
@@ -43,10 +90,12 @@ class Requirement(Base):
     )
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     req_id = Column(String(20), nullable=False)
     version = Column(Integer, nullable=False)
     title = Column(Text, nullable=False)
     description = Column(Text, nullable=False)
+    module = Column(String(100), nullable=True)
     status = Column(String(20), default="Draft")
     is_current = Column(Boolean, default=False)
     change_note = Column(Text)
@@ -68,6 +117,7 @@ class TestCase(Base):
     expected_result = Column(Text, nullable=False)
     priority = Column(String(10))
     status = Column(String(20), default="Draft")
+    module = Column(String(100), nullable=True)
     requirement_id = Column(
         Integer, ForeignKey("requirements.id"), nullable=True
     )
@@ -80,11 +130,13 @@ class Defect(Base):
     __tablename__ = "defects"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     code = Column(String(20), unique=True, nullable=False)
     title = Column(Text, nullable=False)
     description = Column(Text)
     severity = Column(String(20))
     status = Column(String(20), default="Open")
+    module = Column(String(100), nullable=True)
     testcase_id = Column(Integer, ForeignKey("test_cases.id"), nullable=True)
     requirement_id = Column(Integer, ForeignKey("requirements.id"), nullable=True)
     found_in_version = Column(String(50))
