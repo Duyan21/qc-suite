@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { cn, formatDate } from '@/lib/utils'
 import { useToast } from '@/lib/toast'
+import { getCurrentUser, type CurrentUser } from '@/lib/auth'
 import { createProject, listProjects, updateProject, type Project, type ProjectUpdatePayload } from '@/lib/projects'
 import { listMembers, type Member } from '@/lib/members'
 
@@ -51,9 +52,14 @@ export function ProjectsTab() {
   const [form, setForm] = useState<ProjectUpdatePayload | null>(null)
   const [moduleInput, setModuleInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   useEffect(() => {
     load()
+  }, [])
+
+  useEffect(() => {
+    getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null))
   }, [])
 
   function load() {
@@ -150,10 +156,12 @@ export function ProjectsTab() {
           <h1 className="font-heading text-xl font-semibold">Administration</h1>
           <p className="text-sm text-muted-foreground">Quản lý projects trong hệ thống</p>
         </div>
-        <Button type="button" onClick={() => setCreateOpen(true)} className="w-full sm:w-auto">
-          <Plus />
-          New project
-        </Button>
+        {(currentUser?.is_superadmin || currentUser?.can_create_projects) && (
+          <Button type="button" onClick={() => setCreateOpen(true)} className="w-full sm:w-auto">
+            <Plus />
+            New project
+          </Button>
+        )}
       </div>
 
       {loading && <p className="text-sm text-muted-foreground">Đang tải...</p>}
