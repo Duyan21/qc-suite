@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { UserPlus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,6 +6,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -43,8 +50,10 @@ export function UsersAccessTab() {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviting, setInviting] = useState(false)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     Promise.all([listProjects(), listRoles()])
@@ -62,20 +71,32 @@ export function UsersAccessTab() {
       setLoading(false)
       return
     }
+    const requestId = ++requestIdRef.current
     setLoading(true)
     listMembers(projectId)
-      .then(setMembers)
-      .catch((err) => toast.error(err instanceof Error ? err.message : 'Không thể tải thành viên'))
-      .finally(() => setLoading(false))
+      .then((list) => {
+        if (requestIdRef.current !== requestId) return
+        setMembers(list)
+      })
+      .catch((err) => {
+        if (requestIdRef.current !== requestId) return
+        toast.error(err instanceof Error ? err.message : 'Không thể tải thành viên')
+      })
+      .finally(() => {
+        if (requestIdRef.current !== requestId) return
+        setLoading(false)
+      })
   }, [projectId])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return members
-    return members.filter(
-      (m) => m.email.toLowerCase().includes(q) || (m.full_name ?? '').toLowerCase().includes(q),
-    )
-  }, [members, search])
+    return members.filter((m) => {
+      const matchesSearch =
+        !q || m.email.toLowerCase().includes(q) || (m.full_name ?? '').toLowerCase().includes(q)
+      const matchesRole = !roleFilter || m.role_key === roleFilter
+      return matchesSearch && matchesRole
+    })
+  }, [members, search, roleFilter])
 
   const stats = useMemo(
     () => ({
@@ -168,14 +189,32 @@ export function UsersAccessTab() {
       <Card>
         <CardHeader className="gap-3">
           <CardTitle>Members</CardTitle>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm tên, email..."
-              className="pl-8"
-            />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Tìm tên, email..."
+                className="pl-8"
+              />
+            </div>
+            <Select
+              value={roleFilter ?? 'all'}
+              onValueChange={(value) => setRoleFilter(value === 'all' ? null : value)}
+            >
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="Mọi vai trò" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Mọi vai trò</SelectItem>
+                {roles.map((r) => (
+                  <SelectItem key={r.key} value={r.key}>
+                    {r.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto px-0">
