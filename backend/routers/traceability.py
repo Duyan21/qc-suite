@@ -44,7 +44,7 @@ def get_traceability(
     requirements = (
         db.query(Requirement)
         .filter(Requirement.project_id == project_id, Requirement.is_current == True)
-        .order_by(Requirement.module.nulls_last(), Requirement.id)
+        .order_by(Requirement.id)
         .all()
     )
     requirement_ids = [r.id for r in requirements]
@@ -124,7 +124,6 @@ def get_traceability(
                 req_id=req.req_id,
                 version=req.version,
                 title=req.title,
-                module=req.module,
                 status=req.status,
                 is_uncovered=(total == 0),
                 coverage_percent=(covered_count / total) if total else 0.0,

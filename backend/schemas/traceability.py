@@ -20,7 +20,6 @@ class TraceabilityRequirementItem(BaseModel):
     req_id: str
     version: int
     title: str
-    module: str | None
     status: str
     is_uncovered: bool
     coverage_percent: float

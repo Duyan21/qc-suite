@@ -14,7 +14,6 @@ class DefectCreate(BaseModel):
     description: str | None = None
     severity: DefectSeverity
     status: DefectStatus = "Open"
-    module: str | None = None
     testcase_id: int | None = None
     requirement_id: int | None = None
     project_id: int
@@ -33,7 +32,6 @@ class DefectResponse(BaseModel):
     description: str | None
     severity: str | None
     status: str
-    module: str | None
     testcase_id: int | None
     requirement_id: int | None
     found_in_version: str | None

@@ -29,7 +29,6 @@ class Project(Base):
     description = Column(Text)
     key = Column(String(20), unique=True, nullable=False)
     lead_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    modules = Column(ARRAY(String), default=list)
     status = Column(String(20), default="Active")
     require_requirement_link = Column(Boolean, default=True)
     auto_resolve_days = Column(Integer, nullable=True)
@@ -81,6 +80,18 @@ class Release(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 
+class Module(Base):
+    __tablename__ = "modules"
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="uq_modules_project_name"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+
 class Requirement(Base):
     __tablename__ = "requirements"
     __table_args__ = (
@@ -93,7 +104,7 @@ class Requirement(Base):
     version = Column(Integer, nullable=False)
     title = Column(Text, nullable=False)
     description = Column(Text, nullable=False)
-    module = Column(String(100), nullable=True)
+    module_id = Column(Integer, ForeignKey("modules.id"), nullable=True)
     status = Column(String(20), default="Draft")
     is_current = Column(Boolean, default=False)
     change_note = Column(Text)
@@ -115,7 +126,6 @@ class TestCase(Base):
     expected_result = Column(Text, nullable=False)
     priority = Column(String(10))
     status = Column(String(20), default="Draft")
-    module = Column(String(100), nullable=True)
     requirement_id = Column(
         Integer, ForeignKey("requirements.id"), nullable=True
     )
@@ -134,7 +144,6 @@ class Defect(Base):
     description = Column(Text)
     severity = Column(String(20))
     status = Column(String(20), default="Open")
-    module = Column(String(100), nullable=True)
     testcase_id = Column(Integer, ForeignKey("test_cases.id"), nullable=True)
     requirement_id = Column(Integer, ForeignKey("requirements.id"), nullable=True)
     found_in_version = Column(String(50))
