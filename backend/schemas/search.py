@@ -4,7 +4,7 @@ from schemas.common import RequirementSummary
 
 
 class SearchRequest(BaseModel):
-    project_id: int
+    project_id: int | None = None
     query: str
     limit: int = Field(default=10, ge=1, le=100)
     threshold: float = Field(default=0.70, ge=0.0, le=1.0)

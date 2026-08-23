@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from models.all_models import Defect, Project, Requirement, TestCase
+from models.all_models import Defect, Project, Requirement, TestCase, User
 from models.base import get_db
 from schemas.common import RequirementSummary, TestCaseSummary
 from schemas.defects import (
@@ -16,6 +16,7 @@ from schemas.defects import (
 )
 from services.auth_service import get_current_user
 from services.code_generator import next_code
+from services.permissions import PermissionArea, PermissionLevel, check_permission, permitted_project_ids
 
 router = APIRouter(
     prefix="/defects",
@@ -35,13 +36,19 @@ def list_defects(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     if project_id is not None and db.get(Project, project_id) is None:
         raise HTTPException(status_code=404, detail="project_id not found")
 
     query = db.query(Defect)
     if project_id is not None:
+        check_permission(db, current_user, project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
         query = query.filter(Defect.project_id == project_id)
+    else:
+        allowed_ids = permitted_project_ids(db, current_user, PermissionArea.DEFECTS, PermissionLevel.READ)
+        if allowed_ids is not None:
+            query = query.filter(Defect.project_id.in_(allowed_ids))
     if severity is not None:
         query = query.filter(Defect.severity == severity)
     if status_filter is not None:
@@ -80,9 +87,10 @@ def list_defects(
 
 
 @router.post("", response_model=DefectResponse, status_code=status.HTTP_201_CREATED)
-def create_defect(payload: DefectCreate, db: Session = Depends(get_db)):
+def create_defect(payload: DefectCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if db.get(Project, payload.project_id) is None:
         raise HTTPException(status_code=400, detail="project_id not found")
+    check_permission(db, current_user, payload.project_id, PermissionArea.DEFECTS, PermissionLevel.EDIT)
     if payload.testcase_id is not None and db.get(TestCase, payload.testcase_id) is None:
         raise HTTPException(status_code=400, detail="testcase_id not found")
     if payload.requirement_id is not None and db.get(Requirement, payload.requirement_id) is None:
@@ -95,7 +103,6 @@ def create_defect(payload: DefectCreate, db: Session = Depends(get_db)):
         description=payload.description,
         severity=payload.severity,
         status=payload.status,
-        module=payload.module,
         testcase_id=payload.testcase_id,
         requirement_id=payload.requirement_id,
         project_id=payload.project_id,
@@ -107,9 +114,10 @@ def create_defect(payload: DefectCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/stats", response_model=DefectStatsResponse)
-def get_defect_stats(project_id: int, db: Session = Depends(get_db)):
+def get_defect_stats(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if db.get(Project, project_id) is None:
         raise HTTPException(status_code=404, detail="project_id not found")
+    check_permission(db, current_user, project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
 
     total = db.query(Defect).filter(Defect.project_id == project_id).count()
 
@@ -133,10 +141,11 @@ def get_defect_stats(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{id}", response_model=DefectDetailResponse)
-def get_defect(id: int, db: Session = Depends(get_db)):
+def get_defect(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     defect = db.get(Defect, id)
     if defect is None:
         raise HTTPException(status_code=404, detail="Defect not found")
+    check_permission(db, current_user, defect.project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
 
     test_case = db.get(TestCase, defect.testcase_id) if defect.testcase_id else None
     requirement = db.get(Requirement, defect.requirement_id) if defect.requirement_id else None
@@ -150,10 +159,11 @@ def get_defect(id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{id}", response_model=DefectResponse)
-def update_defect(id: int, payload: DefectUpdate, db: Session = Depends(get_db)):
+def update_defect(id: int, payload: DefectUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     defect = db.get(Defect, id)
     if defect is None:
         raise HTTPException(status_code=404, detail="Defect not found")
+    check_permission(db, current_user, defect.project_id, PermissionArea.DEFECTS, PermissionLevel.EDIT)
 
     defect.severity = payload.severity
     defect.status = payload.status
@@ -164,10 +174,11 @@ def update_defect(id: int, payload: DefectUpdate, db: Session = Depends(get_db))
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_defect(id: int, db: Session = Depends(get_db)):
+def delete_defect(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     defect = db.get(Defect, id)
     if defect is None:
         raise HTTPException(status_code=404, detail="Defect not found")
+    check_permission(db, current_user, defect.project_id, PermissionArea.DEFECTS, PermissionLevel.FULL)
 
     db.delete(defect)
     db.commit()

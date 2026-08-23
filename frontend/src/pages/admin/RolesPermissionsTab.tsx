@@ -1,0 +1,232 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { cn } from '@/lib/utils'
+import { useToast } from '@/lib/toast'
+import { getCurrentUser, type CurrentUser } from '@/lib/auth'
+import { getPermissionMatrix, updatePermissionMatrix, type PermissionMatrix, type PermissionMatrixCell } from '@/lib/roles'
+import { listUsers, updateUserAccess, type SystemUser } from '@/lib/users'
+
+function getInitials(name: string | null, email: string): string {
+  const source = (name ?? '').trim()
+  if (!source) return email[0]?.toUpperCase() ?? '?'
+  const parts = source.split(/\s+/)
+  const first = parts[0]?.[0] ?? ''
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : ''
+  return (first + last).toUpperCase()
+}
+
+const AREAS: { key: string; label: string }[] = [
+  { key: 'project_settings', label: 'Project settings' },
+  { key: 'members_roles', label: 'Members & roles' },
+  { key: 'requirements', label: 'Requirements' },
+  { key: 'test_cases', label: 'Test cases' },
+  { key: 'test_runs', label: 'Test runs' },
+  { key: 'defects', label: 'Defects' },
+  { key: 'ai_tools', label: 'AI tools & agents' },
+  { key: 'audit_log', label: 'Audit log' },
+]
+
+const LEVEL_LABEL: Record<string, string> = { none: 'None', read: 'Read', edit: 'Edit', full: 'Full' }
+const LEVEL_CYCLE: PermissionMatrixCell['level'][] = ['none', 'read', 'edit', 'full']
+const LEVEL_BADGE_CLASS: Record<string, string> = {
+  none: 'bg-muted text-muted-foreground',
+  read: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+  edit: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+  full: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+}
+
+export function RolesPermissionsTab() {
+  const toast = useToast()
+  const [matrix, setMatrix] = useState<PermissionMatrix | null>(null)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [users, setUsers] = useState<SystemUser[]>([])
+
+  useEffect(() => {
+    Promise.all([getPermissionMatrix(), getCurrentUser()])
+      .then(([m, user]) => {
+        setMatrix(m)
+        setCurrentUser(user)
+        if (user.is_superadmin) {
+          listUsers()
+            .then(setUsers)
+            .catch((err) => toast.error(err instanceof Error ? err.message : 'Không thể tải danh sách người dùng'))
+        }
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : 'Không thể tải ma trận quyền'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  function handleUserToggle(userId: number, field: 'is_superadmin' | 'can_create_projects', value: boolean) {
+    const previous = users.find((u) => u.id === userId)?.[field] ?? !value
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, [field]: value } : u)))
+    updateUserAccess(userId, { [field]: value }).catch((err) => {
+      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật quyền hệ thống')
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, [field]: previous } : u)))
+    })
+  }
+
+  const cellByRoleArea = useMemo(() => {
+    const map = new Map<string, PermissionMatrixCell>()
+    matrix?.cells.forEach((c) => map.set(`${c.role_key}:${c.area}`, c))
+    return map
+  }, [matrix])
+
+  // The role cards used to render an empty "người dùng" label with no number.
+  // Real cross-project member counts aren't available here (this tab only
+  // fetches the matrix), so show what the fetched data actually supports:
+  // how many of the 8 permission areas the role is granted above "none".
+  const grantedAreaCountByRole = useMemo(() => {
+    const counts = new Map<string, number>()
+    matrix?.roles.forEach((role) => counts.set(role.key, 0))
+    matrix?.cells.forEach((c) => {
+      if (c.level !== 'none') counts.set(c.role_key, (counts.get(c.role_key) ?? 0) + 1)
+    })
+    return counts
+  }, [matrix])
+
+  function handleCellClick(roleKey: string, area: string) {
+    if (!matrix || !currentUser?.is_superadmin) return
+    const current = cellByRoleArea.get(`${roleKey}:${area}`)?.level ?? 'none'
+    const nextIndex = (LEVEL_CYCLE.indexOf(current) + 1) % LEVEL_CYCLE.length
+    const nextLevel = LEVEL_CYCLE[nextIndex]
+
+    setMatrix((prev) =>
+      prev
+        ? { ...prev, cells: prev.cells.map((c) => (c.role_key === roleKey && c.area === area ? { ...c, level: nextLevel } : c)) }
+        : prev,
+    )
+
+    updatePermissionMatrix([{ role_key: roleKey, area, level: nextLevel }]).catch((err) => {
+      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật quyền')
+      setMatrix((prev) =>
+        prev
+          ? { ...prev, cells: prev.cells.map((c) => (c.role_key === roleKey && c.area === area ? { ...c, level: current } : c)) }
+          : prev,
+      )
+    })
+  }
+
+  if (loading || !matrix) {
+    return <p className="text-sm text-muted-foreground">Đang tải...</p>
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {matrix.roles.map((role) => (
+          <Card key={role.key}>
+            <CardContent className="p-4">
+              <div className="text-sm font-medium">{role.name}</div>
+              <div className="text-xs text-muted-foreground">
+                {grantedAreaCountByRole.get(role.key) ?? 0}/{AREAS.length} nhóm quyền được cấp
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Permission matrix</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto px-0">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                <th className="px-4 py-2 font-medium">Area</th>
+                {matrix.roles.map((role) => (
+                  <th key={role.key} className="px-4 py-2 text-center font-medium">{role.name}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {AREAS.map((area) => (
+                <tr key={area.key} className="border-b last:border-0">
+                  <td className="px-4 py-2.5 font-medium">{area.label}</td>
+                  {matrix.roles.map((role) => {
+                    const level = cellByRoleArea.get(`${role.key}:${area.key}`)?.level ?? 'none'
+                    return (
+                      <td key={role.key} className="px-4 py-2.5 text-center">
+                        <button
+                          type="button"
+                          disabled={!currentUser?.is_superadmin}
+                          onClick={() => handleCellClick(role.key, area.key)}
+                          className={cn(
+                            'rounded-full px-2.5 py-0.5 text-xs font-medium',
+                            LEVEL_BADGE_CLASS[level],
+                            currentUser?.is_superadmin && 'cursor-pointer hover:opacity-80',
+                          )}
+                        >
+                          {LEVEL_LABEL[level]}
+                        </button>
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-muted-foreground">
+        Vai trò áp dụng theo từng project — một người có thể là QA Lead ở project này và Viewer ở project khác.
+      </p>
+
+      {currentUser?.is_superadmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle>System access</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Quyền toàn hệ thống, không thuộc project nào — Superadmin quản lý mọi project và
+              permission matrix; Can create projects chỉ cho phép tạo project mới.
+            </p>
+          </CardHeader>
+          <CardContent className="overflow-x-auto px-0">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                  <th className="px-4 py-2 font-medium">User</th>
+                  <th className="px-4 py-2 font-medium">Superadmin</th>
+                  <th className="px-4 py-2 font-medium">Can create projects</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b last:border-0">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar>
+                          <AvatarFallback>{getInitials(u.full_name, u.email)}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="font-medium">{u.full_name ?? u.email}</div>
+                          <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Switch
+                        checked={u.is_superadmin}
+                        onCheckedChange={(checked) => handleUserToggle(u.id, 'is_superadmin', checked)}
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Switch
+                        checked={u.can_create_projects}
+                        onCheckedChange={(checked) => handleUserToggle(u.id, 'can_create_projects', checked)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}

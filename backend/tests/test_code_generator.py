@@ -5,7 +5,7 @@ from services.code_generator import next_code
 
 
 def _create_project(db_session):
-    project = Project(name="Home Lending", description="d")
+    project = Project(name="Home Lending", description="d", key="CGN")
     db_session.add(project)
     db_session.commit()
     db_session.refresh(project)

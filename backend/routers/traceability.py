@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models.all_models import Project, Requirement, TestCase, TestRun, TestRunResult
+from models.all_models import Module, Project, Requirement, TestCase, TestRun, TestRunResult
 from models.base import get_db
 from schemas.traceability import (
     TraceabilityRequirementItem,
@@ -12,6 +12,7 @@ from schemas.traceability import (
     TraceabilityTestCaseItem,
 )
 from services.auth_service import get_current_user
+from services.permissions import PermissionArea, PermissionLevel, require_permission
 
 router = APIRouter(
     prefix="/traceability",
@@ -35,6 +36,7 @@ def get_traceability(
     project_id: int = Query(...),
     release_id: int | None = Query(None),
     db: Session = Depends(get_db),
+    _permission: None = Depends(require_permission(PermissionArea.REQUIREMENTS, PermissionLevel.READ)),
 ):
     if db.get(Project, project_id) is None:
         raise HTTPException(status_code=404, detail="project_id not found")
@@ -42,9 +44,18 @@ def get_traceability(
     requirements = (
         db.query(Requirement)
         .filter(Requirement.project_id == project_id, Requirement.is_current == True)
-        .order_by(Requirement.module.nulls_last(), Requirement.id)
+        .order_by(Requirement.id)
         .all()
     )
+
+    module_ids = {r.module_id for r in requirements if r.module_id is not None}
+    module_name_by_id: dict[int, str] = {}
+    if module_ids:
+        module_name_by_id = {
+            m.id: m.name for m in db.query(Module).filter(Module.id.in_(module_ids)).all()
+        }
+    requirements.sort(key=lambda r: (module_name_by_id.get(r.module_id) is None, module_name_by_id.get(r.module_id, ""), r.id))
+
     requirement_ids = [r.id for r in requirements]
 
     test_cases = (
@@ -122,7 +133,7 @@ def get_traceability(
                 req_id=req.req_id,
                 version=req.version,
                 title=req.title,
-                module=req.module,
+                module=module_name_by_id.get(req.module_id),
                 status=req.status,
                 is_uncovered=(total == 0),
                 coverage_percent=(covered_count / total) if total else 0.0,

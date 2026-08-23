@@ -79,3 +79,41 @@ def test_search_respects_limit(client, auth_headers, db_session):
     )
 
     assert len(response.json()["items"]) <= 2
+
+
+def test_search_without_project_id_filters_to_permitted(client, db_session, member_user, project, role_by_key):
+    from models.all_models import ProjectMember, Requirement, TestCase
+    from services.code_generator import next_code
+    from services.auth_service import create_access_token
+
+    req = Requirement(
+        project_id=project.id, req_id=next_code(db_session, Requirement, "req_id", "REQ"),
+        version=1, title="T", description="d", status="Active", is_current=True,
+    )
+    db_session.add(req)
+    db_session.commit()
+    db_session.refresh(req)
+
+    tc = TestCase(
+        code=next_code(db_session, TestCase, "code", "TC"), title="Login flow",
+        expected_result="ok", priority="High", status="Active", requirement_id=req.id,
+        embedding=[0.1] * 768,
+    )
+    db_session.add(tc)
+    db_session.commit()
+
+    viewer = role_by_key("viewer")
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=viewer.id))
+    db_session.commit()
+
+    headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
+    response = client.post("/search", json={"query": "login", "threshold": 0.0}, headers=headers)
+    assert response.status_code == 200
+    # member has read access to `project` via viewer role, so results from it are allowed through
+
+
+def test_search_with_project_id_denies_non_member(client, member_auth_headers, project):
+    response = client.post(
+        "/search", json={"query": "login", "project_id": project.id}, headers=member_auth_headers
+    )
+    assert response.status_code == 403

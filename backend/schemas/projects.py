@@ -8,10 +8,29 @@ class ProjectCreate(BaseModel):
     description: str | None = None
 
 
+class ProjectUpdate(BaseModel):
+    name: str
+    description: str | None = None
+    key: str
+    lead_user_id: int | None = None
+    status: str
+    require_requirement_link: bool
+    auto_resolve_days: int | None = None
+    ai_impact_suggestions: bool
+    default_severity: str
+
+
 class ProjectResponse(BaseModel):
     id: int
     name: str
     description: str | None
+    key: str
+    lead_user_id: int | None
+    status: str
+    require_requirement_link: bool
+    auto_resolve_days: int | None
+    ai_impact_suggestions: bool
+    default_severity: str
     created_at: datetime
 
     class Config:

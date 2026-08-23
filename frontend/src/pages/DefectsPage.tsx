@@ -376,6 +376,7 @@ export function DefectsPage() {
           open={newOpen}
           onOpenChange={setNewOpen}
           projectId={project.id}
+          defaultSeverity={(project.default_severity as DefectSeverity) ?? 'Medium'}
           onCreated={(defect) => {
             load(project.id)
             toast.success(`Đã tạo defect ${defect.code}.`, {
