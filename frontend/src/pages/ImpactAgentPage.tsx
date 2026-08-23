@@ -49,6 +49,7 @@ export function ImpactAgentPage() {
   useEffect(() => {
     if (prevProjectIdRef.current === projectId) return
     prevProjectIdRef.current = projectId
+    searchRequestId.current += 1
     analyseRequestId.current += 1
     compareRequestId.current += 1
     setSelectedReq(null)
@@ -62,6 +63,7 @@ export function ImpactAgentPage() {
 
   useEffect(() => {
     if (!project || searchTerm.trim().length < 2) {
+      searchRequestId.current += 1
       setSearchResults([])
       return
     }
@@ -82,6 +84,7 @@ export function ImpactAgentPage() {
 
   function selectRequirement(req: Requirement) {
     analyseRequestId.current += 1
+    compareRequestId.current += 1
     setSelectedReq(req)
     setSearchOpen(false)
     setSearchTerm('')
@@ -113,7 +116,10 @@ export function ImpactAgentPage() {
   function toggleCompare(enabled: boolean) {
     setCompareEnabled(enabled)
     if (enabled && selectedReq) loadPreviousVersion(selectedReq)
-    if (!enabled) setPreviousReq(null)
+    if (!enabled) {
+      compareRequestId.current += 1
+      setPreviousReq(null)
+    }
   }
 
   function runAnalysis() {
@@ -182,7 +188,6 @@ export function ImpactAgentPage() {
               variant="outline"
               className="w-full justify-start sm:max-w-md"
               disabled={!project}
-              onClick={() => setSearchOpen(true)}
             >
               <SearchIcon className="size-4" />
               {selectedReq ? `${selectedReq.req_id} — ${selectedReq.title}` : 'Chọn requirement theo code hoặc title...'}
@@ -277,6 +282,7 @@ export function ImpactAgentPage() {
         <>
           <p className="text-sm text-muted-foreground">
             Analysed {result.summary.linked_tc_count} linked TCs + {result.summary.related_tc_count} related TCs · {result.summary.defect_count} defects
+            {' '}· {result.req_id} v{result.version}
           </p>
 
           <Card className="flex flex-col gap-3 p-4">
