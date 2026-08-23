@@ -18,6 +18,7 @@ from routers.search import router as search_router
 from routers.roles import router as roles_router
 from routers.users import router as users_router
 from routers.modules import router as modules_router
+from routers.agent import router as agent_router
 
 
 def ensure_superadmin() -> None:
@@ -70,6 +71,7 @@ app.include_router(search_router)
 app.include_router(roles_router)
 app.include_router(users_router)
 app.include_router(modules_router)
+app.include_router(agent_router)
 
 
 @app.get("/health")
