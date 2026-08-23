@@ -53,14 +53,19 @@ export function RolesPermissionsTab() {
     const nextIndex = (LEVEL_CYCLE.indexOf(current) + 1) % LEVEL_CYCLE.length
     const nextLevel = LEVEL_CYCLE[nextIndex]
 
-    const nextCells = matrix.cells.map((c) =>
-      c.role_key === roleKey && c.area === area ? { ...c, level: nextLevel } : c,
+    setMatrix((prev) =>
+      prev
+        ? { ...prev, cells: prev.cells.map((c) => (c.role_key === roleKey && c.area === area ? { ...c, level: nextLevel } : c)) }
+        : prev,
     )
-    setMatrix({ ...matrix, cells: nextCells })
 
     updatePermissionMatrix([{ role_key: roleKey, area, level: nextLevel }]).catch((err) => {
       toast.error(err instanceof Error ? err.message : 'Không thể cập nhật quyền')
-      setMatrix(matrix) // revert on failure
+      setMatrix((prev) =>
+        prev
+          ? { ...prev, cells: prev.cells.map((c) => (c.role_key === roleKey && c.area === area ? { ...c, level: current } : c)) }
+          : prev,
+      )
     })
   }
 
