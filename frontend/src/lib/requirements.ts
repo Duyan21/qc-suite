@@ -8,6 +8,8 @@ export type Requirement = {
   version: number
   title: string
   description: string
+  module_id: number | null
+  module_name: string | null
   status: string
   is_current: boolean
   change_note: string | null
@@ -68,6 +70,7 @@ export async function getRequirementHistory(reqId: string): Promise<Requirement[
 export async function createRequirement(payload: {
   title: string
   description: string
+  module_id: number
   status: RequirementStatus
   project_id: number
 }): Promise<Requirement> {
@@ -79,6 +82,7 @@ export async function updateRequirement(
   payload: {
     title: string
     description: string
+    module_id: number
     status: RequirementStatus
     change_note?: string
   },
