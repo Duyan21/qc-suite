@@ -133,7 +133,7 @@ export function ProjectsTab() {
 
   function addModule() {
     const value = moduleInput.trim()
-    if (!value || !form) return
+    if (!value || !form || form.modules.includes(value)) return
     setForm({ ...form, modules: [...form.modules, value] })
     setModuleInput('')
   }
