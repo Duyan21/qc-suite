@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Pencil, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import { getCurrentUser, type CurrentUser } from '@/lib/auth'
 import { createProject, listProjects, updateProject, type Project, type ProjectUpdatePayload } from '@/lib/projects'
 import { listMembers, type Member } from '@/lib/members'
 import { useCurrentProject } from '@/lib/currentProject'
+import { listModules, createModule, updateModule, deleteModule, type Module } from '@/lib/modules'
 
 const DEFECT_WORKFLOW = ['Open', 'In Progress', 'Resolved', 'Closed']
 
@@ -29,7 +30,6 @@ function toSettingsForm(project: Project): ProjectUpdatePayload {
     description: project.description ?? undefined,
     key: project.key,
     lead_user_id: project.lead_user_id,
-    modules: project.modules,
     status: project.status,
     require_requirement_link: project.require_requirement_link,
     auto_resolve_days: project.auto_resolve_days,
@@ -50,9 +50,14 @@ export function ProjectsTab() {
   const [creating, setCreating] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   const [form, setForm] = useState<ProjectUpdatePayload | null>(null)
-  const [moduleInput, setModuleInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+
+  const [moduleList, setModuleList] = useState<Module[]>([])
+  const [newModuleName, setNewModuleName] = useState('')
+  const [moduleError, setModuleError] = useState<string | null>(null)
+  const [editingModuleId, setEditingModuleId] = useState<number | null>(null)
+  const [editingModuleName, setEditingModuleName] = useState('')
 
   useEffect(() => {
     load()
@@ -93,12 +98,19 @@ export function ProjectsTab() {
     if (!selected) {
       setForm(null)
       setMembers([])
+      setModuleList([])
       return
     }
     setForm(toSettingsForm(selected))
+    setNewModuleName('')
+    setModuleError(null)
+    setEditingModuleId(null)
     listMembers(selected.id)
       .then(setMembers)
       .catch(() => setMembers([]))
+    listModules(selected.id)
+      .then(setModuleList)
+      .catch(() => setModuleList([]))
   }, [selected])
 
   function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -142,16 +154,60 @@ export function ProjectsTab() {
       .finally(() => setSaving(false))
   }
 
-  function addModule() {
-    const value = moduleInput.trim()
-    if (!value || !form || form.modules.includes(value)) return
-    setForm({ ...form, modules: [...form.modules, value] })
-    setModuleInput('')
+  function handleAddModule() {
+    if (!selected) return
+    const name = newModuleName.trim()
+    if (!name) {
+      setModuleError('Vui lòng nhập tên module')
+      return
+    }
+    setModuleError(null)
+    createModule(selected.id, name)
+      .then((module) => {
+        setModuleList((prev) => [...prev, module])
+        setNewModuleName('')
+      })
+      .catch((err) => {
+        setModuleError(err instanceof Error ? err.message : 'Không thể thêm module')
+      })
   }
 
-  function removeModule(mod: string) {
-    if (!form) return
-    setForm({ ...form, modules: form.modules.filter((m) => m !== mod) })
+  function startEditModule(module: Module) {
+    setEditingModuleId(module.id)
+    setEditingModuleName(module.name)
+  }
+
+  function cancelEditModule() {
+    setEditingModuleId(null)
+    setEditingModuleName('')
+  }
+
+  function saveEditModule(module: Module) {
+    if (!selected) return
+    const name = editingModuleName.trim()
+    if (!name || name === module.name) {
+      cancelEditModule()
+      return
+    }
+    updateModule(selected.id, module.id, name)
+      .then((updated) => {
+        setModuleList((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
+        cancelEditModule()
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : 'Không thể đổi tên module')
+      })
+  }
+
+  function handleDeleteModule(module: Module) {
+    if (!selected) return
+    deleteModule(selected.id, module.id)
+      .then(() => {
+        setModuleList((prev) => prev.filter((m) => m.id !== module.id))
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : 'Không thể xoá module')
+      })
   }
 
   return (
@@ -256,34 +312,71 @@ export function ProjectsTab() {
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-xs uppercase text-muted-foreground">Modules</Label>
                     <div className="flex flex-wrap gap-1.5">
-                      {form.modules.map((mod) => (
-                        <button
-                          key={mod}
-                          type="button"
-                          onClick={() => removeModule(mod)}
-                          className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-accent"
-                          title="Nhấn để xoá"
-                        >
-                          {mod} ×
-                        </button>
-                      ))}
+                      {moduleList.map((module) =>
+                        editingModuleId === module.id ? (
+                          <input
+                            key={module.id}
+                            autoFocus
+                            value={editingModuleName}
+                            onChange={(e) => setEditingModuleName(e.target.value)}
+                            onBlur={() => saveEditModule(module)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                saveEditModule(module)
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault()
+                                cancelEditModule()
+                              }
+                            }}
+                            className="rounded-full border px-2.5 py-0.5 text-xs"
+                          />
+                        ) : (
+                          <span
+                            key={module.id}
+                            className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => startEditModule(module)}
+                              className="flex items-center gap-1 hover:underline"
+                              title="Nhấn để đổi tên"
+                            >
+                              {module.name}
+                              <Pencil className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteModule(module)}
+                              title="Xoá module"
+                              className="hover:text-destructive"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        ),
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Input
-                        value={moduleInput}
-                        onChange={(e) => setModuleInput(e.target.value)}
+                        value={newModuleName}
+                        onChange={(e) => {
+                          setNewModuleName(e.target.value)
+                          if (moduleError) setModuleError(null)
+                        }}
                         placeholder="Thêm module..."
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault()
-                            addModule()
+                            handleAddModule()
                           }
                         }}
                       />
-                      <Button type="button" variant="outline" onClick={addModule}>
+                      <Button type="button" variant="outline" onClick={handleAddModule}>
                         + Add
                       </Button>
                     </div>
+                    {moduleError && <p className="text-xs text-destructive">{moduleError}</p>}
                   </div>
 
                   <div className="flex flex-col gap-1.5">

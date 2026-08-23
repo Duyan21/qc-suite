@@ -6,7 +6,6 @@ export type Project = {
   description: string | null
   key: string
   lead_user_id: number | null
-  modules: string[]
   status: string
   require_requirement_link: boolean
   auto_resolve_days: number | null
@@ -20,7 +19,6 @@ export type ProjectUpdatePayload = {
   description?: string
   key: string
   lead_user_id?: number | null
-  modules: string[]
   status: string
   require_requirement_link: boolean
   auto_resolve_days?: number | null
