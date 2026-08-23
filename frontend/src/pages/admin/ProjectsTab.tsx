@@ -19,6 +19,7 @@ import { useToast } from '@/lib/toast'
 import { getCurrentUser, type CurrentUser } from '@/lib/auth'
 import { createProject, listProjects, updateProject, type Project, type ProjectUpdatePayload } from '@/lib/projects'
 import { listMembers, type Member } from '@/lib/members'
+import { useCurrentProject } from '@/lib/currentProject'
 
 const DEFECT_WORKFLOW = ['Open', 'In Progress', 'Resolved', 'Closed']
 
@@ -33,14 +34,13 @@ function toSettingsForm(project: Project): ProjectUpdatePayload {
     require_requirement_link: project.require_requirement_link,
     auto_resolve_days: project.auto_resolve_days,
     ai_impact_suggestions: project.ai_impact_suggestions,
-    slack_alerts_enabled: project.slack_alerts_enabled,
-    retention_days: project.retention_days,
     default_severity: project.default_severity,
   }
 }
 
 export function ProjectsTab() {
   const toast = useToast()
+  const { refresh: refreshCurrentProject } = useCurrentProject()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -119,6 +119,7 @@ export function ProjectsTab() {
         setCreateOpen(false)
         formEl.reset()
         toast.success(`Đã tạo project "${project.name}"`)
+        refreshCurrentProject().catch(() => {})
       })
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : 'Không thể tạo project')
@@ -133,6 +134,7 @@ export function ProjectsTab() {
       .then((updated) => {
         setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
         toast.success('Đã lưu cấu hình project')
+        refreshCurrentProject().catch(() => {})
       })
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : 'Không thể lưu cấu hình')
@@ -301,7 +303,6 @@ export function ProjectsTab() {
                     {[
                       { key: 'require_requirement_link' as const, label: 'Bắt buộc link requirement', hint: 'Defect phải liên kết ít nhất 1 requirement.' },
                       { key: 'ai_impact_suggestions' as const, label: 'AI Impact Agent', hint: 'Gợi ý test case bị ảnh hưởng khi requirement thay đổi.' },
-                      { key: 'slack_alerts_enabled' as const, label: 'Cảnh báo Slack', hint: 'Gửi thông báo defect Critical vào #qa-alerts.' },
                     ].map((toggle) => (
                       <div key={toggle.key} className="flex items-center justify-between gap-3">
                         <div>
@@ -316,27 +317,17 @@ export function ProjectsTab() {
                     ))}
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs uppercase text-muted-foreground">Retention (ngày)</Label>
-                      <Input
-                        type="number"
-                        value={form.retention_days}
-                        onChange={(e) => setForm({ ...form, retention_days: Number(e.target.value) })}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs uppercase text-muted-foreground">Severity mặc định</Label>
-                      <select
-                        className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-                        value={form.default_severity}
-                        onChange={(e) => setForm({ ...form, default_severity: e.target.value })}
-                      >
-                        {['Low', 'Medium', 'High', 'Critical'].map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className="flex flex-col gap-1.5 sm:w-1/2 sm:pr-1.5">
+                    <Label className="text-xs uppercase text-muted-foreground">Severity mặc định</Label>
+                    <select
+                      className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                      value={form.default_severity}
+                      onChange={(e) => setForm({ ...form, default_severity: e.target.value })}
+                    >
+                      {['Low', 'Medium', 'High', 'Critical'].map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="flex justify-end gap-2">

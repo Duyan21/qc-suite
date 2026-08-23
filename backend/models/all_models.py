@@ -34,8 +34,6 @@ class Project(Base):
     require_requirement_link = Column(Boolean, default=True)
     auto_resolve_days = Column(Integer, nullable=True)
     ai_impact_suggestions = Column(Boolean, default=True)
-    slack_alerts_enabled = Column(Boolean, default=False)
-    retention_days = Column(Integer, default=365)
     default_severity = Column(String(20), default="Medium")
     created_at = Column(TIMESTAMP, server_default=func.now())
 

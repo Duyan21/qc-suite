@@ -18,8 +18,6 @@ class ProjectUpdate(BaseModel):
     require_requirement_link: bool
     auto_resolve_days: int | None = None
     ai_impact_suggestions: bool
-    slack_alerts_enabled: bool
-    retention_days: int
     default_severity: str
 
 
@@ -34,8 +32,6 @@ class ProjectResponse(BaseModel):
     require_requirement_link: bool
     auto_resolve_days: int | None
     ai_impact_suggestions: bool
-    slack_alerts_enabled: bool
-    retention_days: int
     default_severity: str
     created_at: datetime
 
