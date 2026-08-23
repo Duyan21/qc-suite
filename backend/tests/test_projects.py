@@ -74,21 +74,17 @@ def test_update_project_settings(client, auth_headers, project):
             "name": project.name,
             "description": "Updated",
             "key": project.key,
-            "modules": ["Auth", "Payments"],
             "status": "Active",
             "require_requirement_link": False,
             "auto_resolve_days": 7,
             "ai_impact_suggestions": True,
-            "slack_alerts_enabled": True,
-            "retention_days": 180,
             "default_severity": "High",
         },
         headers=auth_headers,
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["modules"] == ["Auth", "Payments"]
-    assert data["retention_days"] == 180
+    assert data["default_severity"] == "High"
 
 
 def test_update_project_settings_requires_edit_permission(client, db_session, project, member_user, role_by_key):
@@ -102,9 +98,9 @@ def test_update_project_settings_requires_edit_permission(client, db_session, pr
     response = client.put(
         f"/projects/{project.id}",
         json={
-            "name": project.name, "description": None, "key": project.key, "modules": [],
+            "name": project.name, "description": None, "key": project.key,
             "status": "Active", "require_requirement_link": True, "auto_resolve_days": None,
-            "ai_impact_suggestions": True, "slack_alerts_enabled": False, "retention_days": 365,
+            "ai_impact_suggestions": True,
             "default_severity": "Medium",
         },
         headers=headers,
@@ -246,9 +242,9 @@ def test_update_project_rejects_duplicate_key(client, auth_headers, project, db_
     db_session.commit()
 
     body = {
-        "name": project.name, "description": None, "key": "DUPKEY", "modules": [],
+        "name": project.name, "description": None, "key": "DUPKEY",
         "status": "Active", "require_requirement_link": True, "auto_resolve_days": None,
-        "ai_impact_suggestions": True, "slack_alerts_enabled": False, "retention_days": 365,
+        "ai_impact_suggestions": True,
         "default_severity": "Medium",
     }
     response = client.put(f"/projects/{project.id}", json=body, headers=auth_headers)

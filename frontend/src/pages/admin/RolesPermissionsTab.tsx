@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/lib/toast'
 import { getCurrentUser, type CurrentUser } from '@/lib/auth'
 import { getPermissionMatrix, updatePermissionMatrix, type PermissionMatrix, type PermissionMatrixCell } from '@/lib/roles'
+import { listUsers, updateUserAccess, type SystemUser } from '@/lib/users'
+
+function getInitials(name: string | null, email: string): string {
+  const source = (name ?? '').trim()
+  if (!source) return email[0]?.toUpperCase() ?? '?'
+  const parts = source.split(/\s+/)
+  const first = parts[0]?.[0] ?? ''
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : ''
+  return (first + last).toUpperCase()
+}
 
 const AREAS: { key: string; label: string }[] = [
   { key: 'project_settings', label: 'Project settings' },
@@ -30,16 +42,31 @@ export function RolesPermissionsTab() {
   const [matrix, setMatrix] = useState<PermissionMatrix | null>(null)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [users, setUsers] = useState<SystemUser[]>([])
 
   useEffect(() => {
     Promise.all([getPermissionMatrix(), getCurrentUser()])
       .then(([m, user]) => {
         setMatrix(m)
         setCurrentUser(user)
+        if (user.is_superadmin) {
+          listUsers()
+            .then(setUsers)
+            .catch((err) => toast.error(err instanceof Error ? err.message : 'Không thể tải danh sách người dùng'))
+        }
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Không thể tải ma trận quyền'))
       .finally(() => setLoading(false))
   }, [])
+
+  function handleUserToggle(userId: number, field: 'is_superadmin' | 'can_create_projects', value: boolean) {
+    const previous = users.find((u) => u.id === userId)?.[field] ?? !value
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, [field]: value } : u)))
+    updateUserAccess(userId, { [field]: value }).catch((err) => {
+      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật quyền hệ thống')
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, [field]: previous } : u)))
+    })
+  }
 
   const cellByRoleArea = useMemo(() => {
     const map = new Map<string, PermissionMatrixCell>()
@@ -148,6 +175,58 @@ export function RolesPermissionsTab() {
       <p className="text-xs text-muted-foreground">
         Vai trò áp dụng theo từng project — một người có thể là QA Lead ở project này và Viewer ở project khác.
       </p>
+
+      {currentUser?.is_superadmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle>System access</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Quyền toàn hệ thống, không thuộc project nào — Superadmin quản lý mọi project và
+              permission matrix; Can create projects chỉ cho phép tạo project mới.
+            </p>
+          </CardHeader>
+          <CardContent className="overflow-x-auto px-0">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                  <th className="px-4 py-2 font-medium">User</th>
+                  <th className="px-4 py-2 font-medium">Superadmin</th>
+                  <th className="px-4 py-2 font-medium">Can create projects</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b last:border-0">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar>
+                          <AvatarFallback>{getInitials(u.full_name, u.email)}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="font-medium">{u.full_name ?? u.email}</div>
+                          <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Switch
+                        checked={u.is_superadmin}
+                        onCheckedChange={(checked) => handleUserToggle(u.id, 'is_superadmin', checked)}
+                      />
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Switch
+                        checked={u.can_create_projects}
+                        onCheckedChange={(checked) => handleUserToggle(u.id, 'can_create_projects', checked)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

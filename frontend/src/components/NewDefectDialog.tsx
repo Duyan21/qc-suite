@@ -28,10 +28,11 @@ type NewDefectDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   projectId: number
+  defaultSeverity: DefectSeverity
   onCreated: (defect: Defect) => void
 }
 
-export function NewDefectDialog({ open, onOpenChange, projectId, onCreated }: NewDefectDialogProps) {
+export function NewDefectDialog({ open, onOpenChange, projectId, defaultSeverity, onCreated }: NewDefectDialogProps) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedRequirement, setSelectedRequirement] = useState<RequirementSummary | null>(null)
@@ -43,7 +44,7 @@ export function NewDefectDialog({ open, onOpenChange, projectId, onCreated }: Ne
     const data = new FormData(form)
     const title = String(data.get('title') ?? '').trim()
     const description = String(data.get('description') ?? '').trim()
-    const severity = String(data.get('severity') ?? 'Medium') as DefectSeverity
+    const severity = String(data.get('severity') ?? defaultSeverity) as DefectSeverity
     const status = String(data.get('status') ?? 'Open') as DefectStatus
 
     setSubmitting(true)
@@ -108,7 +109,7 @@ export function NewDefectDialog({ open, onOpenChange, projectId, onCreated }: Ne
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="new-defect-severity">Mức độ nghiêm trọng</Label>
-              <Select name="severity" defaultValue="Medium">
+              <Select key={defaultSeverity} name="severity" defaultValue={defaultSeverity}>
                 <SelectTrigger id="new-defect-severity" className="w-full">
                   <SelectValue />
                 </SelectTrigger>

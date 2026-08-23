@@ -320,6 +320,10 @@ export function RequirementDetailPage() {
                 <dd>{requirement.req_id}</dd>
               </div>
               <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Module</dt>
+                <dd>{requirement.module_name ?? '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Status</dt>
                 <dd>{requirement.status}</dd>
               </div>

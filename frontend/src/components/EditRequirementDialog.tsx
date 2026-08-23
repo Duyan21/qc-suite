@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { updateRequirement, type Requirement, type RequirementStatus } from '@/lib/requirements'
+import { listModules, type Module } from '@/lib/modules'
 import { useToast } from '@/lib/toast'
 
 type EditRequirementDialogProps = {
@@ -36,9 +37,28 @@ export function EditRequirementDialog({
 }: EditRequirementDialogProps) {
   const toast = useToast()
   const [submitting, setSubmitting] = useState(false)
+  const [modules, setModules] = useState<Module[]>([])
+  const [modulesLoading, setModulesLoading] = useState(false)
+  const [moduleId, setModuleId] = useState<string>(
+    requirement.module_id !== null ? String(requirement.module_id) : '',
+  )
+
+  useEffect(() => {
+    if (!open) return
+    setModuleId(requirement.module_id !== null ? String(requirement.module_id) : '')
+    setModulesLoading(true)
+    listModules(requirement.project_id)
+      .then((list) => {
+        setModules(list)
+        setModuleId((current) => current || (list[0] ? String(list[0].id) : ''))
+      })
+      .catch(() => setModules([]))
+      .finally(() => setModulesLoading(false))
+  }, [open, requirement.project_id, requirement.module_id])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!moduleId) return
     const form = event.currentTarget
     const data = new FormData(form)
     const title = String(data.get('title') ?? '').trim()
@@ -48,9 +68,11 @@ export function EditRequirementDialog({
 
     setSubmitting(true)
     try {
+      // Update requirement with module_id
       const updated = await updateRequirement(requirement.id, {
         title,
         description,
+        module_id: Number(moduleId),
         status,
         change_note: changeNote || undefined,
       })
@@ -62,6 +84,8 @@ export function EditRequirementDialog({
       setSubmitting(false)
     }
   }
+
+  const canSubmit = !submitting && !modulesLoading && modules.length > 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -97,6 +121,30 @@ export function EditRequirementDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-req-module">Module</Label>
+              <Select
+                value={moduleId}
+                onValueChange={setModuleId}
+                disabled={modulesLoading || modules.length === 0}
+              >
+                <SelectTrigger id="edit-req-module" className="w-full">
+                  <SelectValue placeholder={modules.length === 0 ? 'Chưa có module' : undefined} />
+                </SelectTrigger>
+                <SelectContent>
+                  {modules.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!modulesLoading && modules.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Chưa có module nào. Thêm module trong Admin → Projects trước.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="edit-req-status">Trạng thái</Label>
               <Select name="status" defaultValue={requirement.status}>
                 <SelectTrigger id="edit-req-status" className="w-full">
@@ -123,7 +171,7 @@ export function EditRequirementDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Hủy
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={!canSubmit}>
               {submitting ? 'Đang lưu...' : 'Lưu'}
             </Button>
           </DialogFooter>

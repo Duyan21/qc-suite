@@ -14,6 +14,7 @@ import random
 
 from models.all_models import (
     Defect,
+    Module,
     Project,
     ProjectMember,
     Release,
@@ -123,7 +124,18 @@ def seed_releases(db, project):
     return releases
 
 
-def seed_requirements(db, project, req_data):
+def seed_modules(db, project, req_data):
+    names = sorted({row["module"] for row in req_data if row.get("module")})
+    modules = {}
+    for name in names:
+        module = Module(project_id=project.id, name=name)
+        db.add(module)
+        modules[name] = module
+    db.flush()
+    return modules
+
+
+def seed_requirements(db, project, req_data, modules):
     requirements = {}
     for row in req_data:
         req_id = row["req_id"]
@@ -134,7 +146,7 @@ def seed_requirements(db, project, req_data):
                 version=1,
                 title=row["title"],
                 description=VERSIONED_OLD_DESCRIPTION,
-                module=row["module"],
+                module_id=modules[row["module"]].id,
                 status="Deprecated",
                 is_current=False,
             )
@@ -147,7 +159,7 @@ def seed_requirements(db, project, req_data):
                 version=2,
                 title=row["title"],
                 description=VERSIONED_NEW_DESCRIPTION,
-                module=row["module"],
+                module_id=modules[row["module"]].id,
                 status="Active",
                 is_current=True,
                 change_note="Tightened income document validity window from 6 months to 3 months per compliance policy update.",
@@ -164,7 +176,7 @@ def seed_requirements(db, project, req_data):
             version=1,
             title=row["title"],
             description=row["description"],
-            module=row["module"],
+            module_id=modules[row["module"]].id,
             status="Active",
             is_current=True,
         )
@@ -187,7 +199,6 @@ def seed_test_cases(db, requirements, tc_data):
             steps=row["steps"],
             expected_result=row["expected_result"],
             priority=row["priority"],
-            module=row["module"],
             status="Active",
             requirement_id=req.id,
         )
@@ -216,7 +227,6 @@ def seed_defects(db, project, test_cases, requirements, defect_data, releases):
             description=description,
             severity=row["severity"],
             status=LEGACY_TO_CANONICAL_DEFECT_STATUS.get(row["status"], row["status"]),
-            module=row["module"],
             testcase_id=test_cases[row["tc_id"]].id if row["tc_id"] else None,
             requirement_id=requirements[row["req_id"]].id if row["req_id"] else None,
             found_in_version=row["environment"],
@@ -289,7 +299,8 @@ def main():
         project = seed_project(db)
         users = seed_users(db, project)
         releases = seed_releases(db, project)
-        requirements = seed_requirements(db, project, req_data)
+        modules = seed_modules(db, project, req_data)
+        requirements = seed_requirements(db, project, req_data, modules)
         test_cases = seed_test_cases(db, requirements, tc_data)
         defects = seed_defects(db, project, test_cases, requirements, defect_data, releases)
         results = seed_test_runs(db, releases, test_cases, defect_data)

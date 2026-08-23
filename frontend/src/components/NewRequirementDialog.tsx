@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createRequirement, type Requirement, type RequirementStatus } from '@/lib/requirements'
+import { listModules, type Module } from '@/lib/modules'
 
 type NewRequirementDialogProps = {
   open: boolean
@@ -35,9 +36,25 @@ export function NewRequirementDialog({
 }: NewRequirementDialogProps) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [modules, setModules] = useState<Module[]>([])
+  const [modulesLoading, setModulesLoading] = useState(false)
+  const [moduleId, setModuleId] = useState<string>('')
+
+  useEffect(() => {
+    if (!open) return
+    setModulesLoading(true)
+    listModules(projectId)
+      .then((list) => {
+        setModules(list)
+        setModuleId(list[0] ? String(list[0].id) : '')
+      })
+      .catch(() => setModules([]))
+      .finally(() => setModulesLoading(false))
+  }, [open, projectId])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!moduleId) return
     const form = event.currentTarget
     const data = new FormData(form)
     const title = String(data.get('title') ?? '').trim()
@@ -47,10 +64,12 @@ export function NewRequirementDialog({
     setSubmitting(true)
     setError(null)
     try {
+      // Create requirement with module_id
       const requirement = await createRequirement({
         project_id: projectId,
         title,
         description,
+        module_id: Number(moduleId),
         status,
       })
       form.reset()
@@ -67,6 +86,8 @@ export function NewRequirementDialog({
     if (!nextOpen) setError(null)
     onOpenChange(nextOpen)
   }
+
+  const canSubmit = !submitting && !modulesLoading && modules.length > 0
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -97,6 +118,30 @@ export function NewRequirementDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
+              <Label htmlFor="new-req-module">Module</Label>
+              <Select
+                value={moduleId}
+                onValueChange={setModuleId}
+                disabled={modulesLoading || modules.length === 0}
+              >
+                <SelectTrigger id="new-req-module" className="w-full">
+                  <SelectValue placeholder={modules.length === 0 ? 'Chưa có module' : undefined} />
+                </SelectTrigger>
+                <SelectContent>
+                  {modules.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!modulesLoading && modules.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Chưa có module nào. Thêm module trong Admin → Projects trước.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="new-req-status">Trạng thái</Label>
               <Select name="status" defaultValue="Draft">
                 <SelectTrigger id="new-req-status" className="w-full">
@@ -115,7 +160,7 @@ export function NewRequirementDialog({
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Hủy
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={!canSubmit}>
               {submitting ? 'Đang tạo...' : 'Tạo'}
             </Button>
           </DialogFooter>

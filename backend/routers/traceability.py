@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models.all_models import Project, Requirement, TestCase, TestRun, TestRunResult
+from models.all_models import Module, Project, Requirement, TestCase, TestRun, TestRunResult
 from models.base import get_db
 from schemas.traceability import (
     TraceabilityRequirementItem,
@@ -44,9 +44,18 @@ def get_traceability(
     requirements = (
         db.query(Requirement)
         .filter(Requirement.project_id == project_id, Requirement.is_current == True)
-        .order_by(Requirement.module.nulls_last(), Requirement.id)
+        .order_by(Requirement.id)
         .all()
     )
+
+    module_ids = {r.module_id for r in requirements if r.module_id is not None}
+    module_name_by_id: dict[int, str] = {}
+    if module_ids:
+        module_name_by_id = {
+            m.id: m.name for m in db.query(Module).filter(Module.id.in_(module_ids)).all()
+        }
+    requirements.sort(key=lambda r: (module_name_by_id.get(r.module_id) is None, module_name_by_id.get(r.module_id, ""), r.id))
+
     requirement_ids = [r.id for r in requirements]
 
     test_cases = (
@@ -124,7 +133,7 @@ def get_traceability(
                 req_id=req.req_id,
                 version=req.version,
                 title=req.title,
-                module=req.module,
+                module=module_name_by_id.get(req.module_id),
                 status=req.status,
                 is_uncovered=(total == 0),
                 coverage_percent=(covered_count / total) if total else 0.0,

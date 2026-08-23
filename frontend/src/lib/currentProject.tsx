@@ -7,6 +7,7 @@ type CurrentProjectContextValue = {
   projects: Project[]
   project: Project | null
   setProject: (p: Project) => void
+  refresh: () => Promise<void>
   loading: boolean
 }
 
@@ -36,9 +37,19 @@ export function CurrentProjectProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, String(p.id))
   }, [])
 
+  // Re-fetches the project list so edits made elsewhere (e.g. Admin's Projects
+  // tab, which keeps its own local copy while it's the one being edited) reach
+  // every other page reading from this shared context — without this, pages
+  // like Defects keep serving a stale `project` object until a full reload.
+  const refresh = useCallback(async () => {
+    const list = await listProjects()
+    setProjects(list)
+    setProjectState((prev) => (prev ? (list.find((p) => p.id === prev.id) ?? prev) : prev))
+  }, [])
+
   const value = useMemo(
-    () => ({ projects, project, setProject, loading }),
-    [projects, project, setProject, loading],
+    () => ({ projects, project, setProject, refresh, loading }),
+    [projects, project, setProject, refresh, loading],
   )
 
   return (
