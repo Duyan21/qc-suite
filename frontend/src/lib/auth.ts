@@ -59,6 +59,9 @@ export type CurrentUser = {
   email: string
   full_name: string | null
   is_active: boolean
+  is_superadmin: boolean
+  can_create_projects: boolean
+  status: string
 }
 
 export async function getCurrentUser(): Promise<CurrentUser> {

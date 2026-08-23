@@ -15,13 +15,17 @@ import random
 from models.all_models import (
     Defect,
     Project,
+    ProjectMember,
     Release,
     Requirement,
+    Role,
     TestCase,
     TestRun,
     TestRunResult,
+    User,
 )
 from models.base import SessionLocal
+from services.auth_service import hash_password
 
 PROJECT_NAME = "Home Lending System"
 
@@ -70,6 +74,7 @@ def load_json(name):
 def seed_project(db):
     project = Project(
         name=PROJECT_NAME,
+        key="HLS",
         description=(
             "End-to-end mortgage lifecycle platform: application, KYC, "
             "income verification, property valuation, credit assessment, "
@@ -79,6 +84,32 @@ def seed_project(db):
     db.add(project)
     db.flush()
     return project
+
+
+def seed_users(db, project):
+    admin_role = db.query(Role).filter(Role.key == "admin").one()
+    tester_role = db.query(Role).filter(Role.key == "tester").one()
+
+    admin_user = User(
+        email="admin@qcsuite.demo",
+        hashed_password=hash_password("changeme123"),
+        full_name="Demo Admin",
+        is_superadmin=True,
+    )
+    tester_user = User(
+        email="tester@qcsuite.demo",
+        hashed_password=hash_password("changeme123"),
+        full_name="Demo Tester",
+    )
+    db.add_all([admin_user, tester_user])
+    db.flush()
+
+    db.add_all([
+        ProjectMember(project_id=project.id, user_id=admin_user.id, role_id=admin_role.id),
+        ProjectMember(project_id=project.id, user_id=tester_user.id, role_id=tester_role.id),
+    ])
+    db.flush()
+    return [admin_user, tester_user]
 
 
 def seed_releases(db, project):
@@ -256,6 +287,7 @@ def main():
         defect_data = load_json("defects.json")
 
         project = seed_project(db)
+        users = seed_users(db, project)
         releases = seed_releases(db, project)
         requirements = seed_requirements(db, project, req_data)
         test_cases = seed_test_cases(db, requirements, tc_data)
@@ -265,7 +297,7 @@ def main():
         db.commit()
 
         print(
-            f"Inserted: 1 project, {len(releases)} releases, "
+            f"Inserted: 1 project, {len(users)} users, {len(releases)} releases, "
             f"{len(requirements)} requirements (current versions), "
             f"{len(test_cases)} test cases, {len(defects)} defects, "
             f"2 test runs, {len(results)} test run results."

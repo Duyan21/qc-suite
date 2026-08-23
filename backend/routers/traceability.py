@@ -12,6 +12,7 @@ from schemas.traceability import (
     TraceabilityTestCaseItem,
 )
 from services.auth_service import get_current_user
+from services.permissions import PermissionArea, PermissionLevel, require_permission
 
 router = APIRouter(
     prefix="/traceability",
@@ -35,6 +36,7 @@ def get_traceability(
     project_id: int = Query(...),
     release_id: int | None = Query(None),
     db: Session = Depends(get_db),
+    _permission: None = Depends(require_permission(PermissionArea.REQUIREMENTS, PermissionLevel.READ)),
 ):
     if db.get(Project, project_id) is None:
         raise HTTPException(status_code=404, detail="project_id not found")

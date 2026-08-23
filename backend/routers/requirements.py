@@ -12,6 +12,7 @@ from schemas.requirements import (
 )
 from services.auth_service import get_current_user
 from services.code_generator import next_code
+from services.permissions import PermissionArea, PermissionLevel, check_permission, require_permission
 
 router = APIRouter(
     prefix="/requirements",
@@ -28,6 +29,7 @@ def list_requirements(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
+    _permission: None = Depends(require_permission(PermissionArea.REQUIREMENTS, PermissionLevel.READ)),
 ):
     if db.get(Project, project_id) is None:
         raise HTTPException(status_code=404, detail="project_id not found")
@@ -58,17 +60,27 @@ def list_requirements(
 
 
 @router.get("/{id}", response_model=RequirementResponse)
-def get_requirement(id: int, db: Session = Depends(get_db)):
+def get_requirement(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     req = db.get(Requirement, id)
     if req is None:
         raise HTTPException(status_code=404, detail="Requirement not found")
+    check_permission(db, current_user, req.project_id, PermissionArea.REQUIREMENTS, PermissionLevel.READ)
     return req
 
 
 @router.post("", response_model=RequirementResponse, status_code=status.HTTP_201_CREATED)
-def create_requirement(payload: RequirementCreate, db: Session = Depends(get_db)):
+def create_requirement(
+    payload: RequirementCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     if db.get(Project, payload.project_id) is None:
         raise HTTPException(status_code=400, detail="project_id not found")
+    check_permission(db, current_user, payload.project_id, PermissionArea.REQUIREMENTS, PermissionLevel.EDIT)
 
     req_id = next_code(db, Requirement, "req_id", "REQ")
     req = Requirement(
@@ -99,6 +111,7 @@ def update_requirement(
         raise HTTPException(status_code=404, detail="Requirement not found")
     if not old.is_current:
         raise HTTPException(status_code=400, detail="Requirement is not the current version")
+    check_permission(db, current_user, old.project_id, PermissionArea.REQUIREMENTS, PermissionLevel.EDIT)
 
     old.is_current = False
 
@@ -132,6 +145,7 @@ def delete_requirement(
         raise HTTPException(status_code=404, detail="Requirement not found")
     if not old.is_current:
         raise HTTPException(status_code=400, detail="Requirement is not the current version")
+    check_permission(db, current_user, old.project_id, PermissionArea.REQUIREMENTS, PermissionLevel.EDIT)
 
     old.is_current = False
 
@@ -155,7 +169,11 @@ def delete_requirement(
 
 
 @router.get("/{req_id}/history", response_model=list[RequirementResponse])
-def get_requirement_history(req_id: str, db: Session = Depends(get_db)):
+def get_requirement_history(
+    req_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     versions = (
         db.query(Requirement)
         .filter(Requirement.req_id == req_id)
@@ -164,4 +182,5 @@ def get_requirement_history(req_id: str, db: Session = Depends(get_db)):
     )
     if not versions:
         raise HTTPException(status_code=404, detail="Requirement not found")
+    check_permission(db, current_user, versions[0].project_id, PermissionArea.REQUIREMENTS, PermissionLevel.READ)
     return versions

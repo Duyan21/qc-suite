@@ -17,6 +17,9 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str | None
     is_active: bool
+    is_superadmin: bool
+    can_create_projects: bool
+    status: str
 
     class Config:
         from_attributes = True
