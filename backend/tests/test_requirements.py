@@ -1,30 +1,42 @@
 import re
 
 
-def _create_requirement(client, auth_headers, project_id, **overrides):
+def _create_requirement(client, auth_headers, db_session, project_id, **overrides):
     body = {
         "title": "User can log in",
         "description": "As a user, I want to log in with email and password",
         "status": "Draft",
         "project_id": project_id,
     }
+    if "module_id" not in overrides:
+        from models.all_models import Module
+
+        module = db_session.query(Module).filter(Module.project_id == project_id).first()
+        if module is None:
+            module = Module(project_id=project_id, name="General")
+            db_session.add(module)
+            db_session.commit()
+            db_session.refresh(module)
+        body["module_id"] = module.id
     body.update(overrides)
     return client.post("/requirements", json=body, headers=auth_headers)
 
 
-def test_create_requirement_rejects_unknown_project(client, auth_headers):
-    response = _create_requirement(client, auth_headers, project_id=999999)
+def test_create_requirement_rejects_unknown_project(client, auth_headers, db_session):
+    response = _create_requirement(client, auth_headers, db_session, project_id=999999, module_id=1)
     assert response.status_code == 400
 
 
-def test_create_requirement_generates_req_id_and_version_1(client, auth_headers, project):
-    response = _create_requirement(client, auth_headers, project.id)
+def test_create_requirement_generates_req_id_and_version_1(client, auth_headers, db_session, project):
+    response = _create_requirement(client, auth_headers, db_session, project.id)
     assert response.status_code == 201
     data = response.json()
     assert re.fullmatch(r"REQ-\d+", data["req_id"])
     assert data["version"] == 1
     assert data["is_current"] is True
     assert data["project_id"] == project.id
+    assert data["module_id"] is not None
+    assert data["module_name"] == "General"
 
 
 def test_list_requirements_requires_project_id(client, auth_headers):
@@ -37,8 +49,8 @@ def test_list_requirements_rejects_unknown_project(client, auth_headers):
     assert response.status_code == 404
 
 
-def test_list_requirements_returns_only_current_versions(client, auth_headers, project):
-    _create_requirement(client, auth_headers, project.id)
+def test_list_requirements_returns_only_current_versions(client, auth_headers, db_session, project):
+    _create_requirement(client, auth_headers, db_session, project.id)
     response = client.get(f"/requirements?project_id={project.id}", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
@@ -54,8 +66,8 @@ def test_list_requirements_scoped_by_project(client, auth_headers, project, db_s
     db_session.commit()
     db_session.refresh(other_project)
 
-    _create_requirement(client, auth_headers, project.id, title="In scope")
-    _create_requirement(client, auth_headers, other_project.id, title="Out of scope")
+    _create_requirement(client, auth_headers, db_session, project.id, title="In scope")
+    _create_requirement(client, auth_headers, db_session, other_project.id, title="Out of scope")
 
     response = client.get(f"/requirements?project_id={project.id}", headers=auth_headers)
     assert response.status_code == 200
@@ -64,27 +76,27 @@ def test_list_requirements_scoped_by_project(client, auth_headers, project, db_s
     assert data["items"][0]["title"] == "In scope"
 
 
-def test_list_requirements_filters_by_status(client, auth_headers, project):
-    _create_requirement(client, auth_headers, project.id, status="Draft")
-    _create_requirement(client, auth_headers, project.id, status="Active")
+def test_list_requirements_filters_by_status(client, auth_headers, db_session, project):
+    _create_requirement(client, auth_headers, db_session, project.id, status="Draft")
+    _create_requirement(client, auth_headers, db_session, project.id, status="Active")
     response = client.get(f"/requirements?project_id={project.id}&status=Active", headers=auth_headers)
     data = response.json()
     assert data["total"] == 1
     assert data["items"][0]["status"] == "Active"
 
 
-def test_list_requirements_search_matches_title(client, auth_headers, project):
-    _create_requirement(client, auth_headers, project.id, title="OTP login flow")
-    _create_requirement(client, auth_headers, project.id, title="Password reset")
+def test_list_requirements_search_matches_title(client, auth_headers, db_session, project):
+    _create_requirement(client, auth_headers, db_session, project.id, title="OTP login flow")
+    _create_requirement(client, auth_headers, db_session, project.id, title="Password reset")
     response = client.get(f"/requirements?project_id={project.id}&search=OTP", headers=auth_headers)
     data = response.json()
     assert data["total"] == 1
     assert "OTP" in data["items"][0]["title"]
 
 
-def test_list_requirements_search_matches_req_id(client, auth_headers, project):
-    created = _create_requirement(client, auth_headers, project.id, title="OTP login flow").json()
-    _create_requirement(client, auth_headers, project.id, title="Password reset")
+def test_list_requirements_search_matches_req_id(client, auth_headers, db_session, project):
+    created = _create_requirement(client, auth_headers, db_session, project.id, title="OTP login flow").json()
+    _create_requirement(client, auth_headers, db_session, project.id, title="Password reset")
     response = client.get(
         f"/requirements?project_id={project.id}&search={created['req_id']}", headers=auth_headers
     )
@@ -93,8 +105,8 @@ def test_list_requirements_search_matches_req_id(client, auth_headers, project):
     assert data["items"][0]["req_id"] == created["req_id"]
 
 
-def test_get_requirement_detail_by_id(client, auth_headers, project):
-    created = _create_requirement(client, auth_headers, project.id).json()
+def test_get_requirement_detail_by_id(client, auth_headers, db_session, project):
+    created = _create_requirement(client, auth_headers, db_session, project.id).json()
     response = client.get(f"/requirements/{created['id']}", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["id"] == created["id"]
@@ -105,12 +117,13 @@ def test_get_requirement_detail_missing_returns_404(client, auth_headers):
     assert response.status_code == 404
 
 
-def test_update_requirement_creates_new_version_and_history_has_three(client, auth_headers, project):
-    v1 = _create_requirement(client, auth_headers, project.id).json()
+def test_update_requirement_creates_new_version_and_history_has_three(client, auth_headers, db_session, project):
+    v1 = _create_requirement(client, auth_headers, db_session, project.id).json()
 
     update_body = {
         "title": "User can log in (v2)",
         "description": "Adds OTP step",
+        "module_id": v1["module_id"],
         "status": "Active",
         "change_note": "Added OTP",
     }
@@ -122,6 +135,7 @@ def test_update_requirement_creates_new_version_and_history_has_three(client, au
     assert v2["previous_version_id"] == v1["id"]
     assert v2["req_id"] == v1["req_id"]
     assert v2["id"] != v1["id"]
+    assert v2["module_id"] == v1["module_id"]
 
     update_body_2 = {**update_body, "title": "User can log in (v3)", "change_note": "Fix wording"}
     v3_response = client.put(f"/requirements/{v2['id']}", json=update_body_2, headers=auth_headers)
@@ -139,12 +153,13 @@ def test_update_requirement_creates_new_version_and_history_has_three(client, au
     assert history[2]["is_current"] is True
 
 
-def test_update_requirement_rejects_non_current_version(client, auth_headers, project):
-    v1 = _create_requirement(client, auth_headers, project.id).json()
+def test_update_requirement_rejects_non_current_version(client, auth_headers, db_session, project):
+    v1 = _create_requirement(client, auth_headers, db_session, project.id).json()
 
     update_body = {
         "title": "User can log in (v2)",
         "description": "Adds OTP step",
+        "module_id": v1["module_id"],
         "status": "Active",
     }
     client.put(f"/requirements/{v1['id']}", json=update_body, headers=auth_headers)
@@ -159,10 +174,10 @@ def test_requirements_require_auth(client, project):
     assert response.status_code == 401
 
 
-def test_list_requirements_paginates_across_pages(client, auth_headers, project):
-    r1 = _create_requirement(client, auth_headers, project.id, title="Req One").json()
-    r2 = _create_requirement(client, auth_headers, project.id, title="Req Two").json()
-    r3 = _create_requirement(client, auth_headers, project.id, title="Req Three").json()
+def test_list_requirements_paginates_across_pages(client, auth_headers, db_session, project):
+    r1 = _create_requirement(client, auth_headers, db_session, project.id, title="Req One").json()
+    r2 = _create_requirement(client, auth_headers, db_session, project.id, title="Req Two").json()
+    r3 = _create_requirement(client, auth_headers, db_session, project.id, title="Req Three").json()
 
     page1 = client.get(f"/requirements?project_id={project.id}&page=1&limit=2", headers=auth_headers).json()
     assert page1["total"] == 3
@@ -178,8 +193,8 @@ def test_list_requirements_paginates_across_pages(client, auth_headers, project)
     assert not set(page2_ids) & set(page1_ids)
 
 
-def test_delete_requirement_creates_deprecated_version(client, auth_headers, project):
-    v1 = _create_requirement(client, auth_headers, project.id).json()
+def test_delete_requirement_creates_deprecated_version(client, auth_headers, db_session, project):
+    v1 = _create_requirement(client, auth_headers, db_session, project.id).json()
 
     response = client.delete(f"/requirements/{v1['id']}", headers=auth_headers)
     assert response.status_code == 200
@@ -193,6 +208,7 @@ def test_delete_requirement_creates_deprecated_version(client, auth_headers, pro
     assert deleted["title"] == v1["title"]
     assert deleted["description"] == v1["description"]
     assert deleted["change_note"] is None
+    assert deleted["module_id"] == v1["module_id"]
 
     old = client.get(f"/requirements/{v1['id']}", headers=auth_headers).json()
     assert old["is_current"] is False
@@ -203,8 +219,8 @@ def test_delete_requirement_missing_returns_404(client, auth_headers):
     assert response.status_code == 404
 
 
-def test_delete_requirement_rejects_non_current_version(client, auth_headers, project):
-    v1 = _create_requirement(client, auth_headers, project.id).json()
+def test_delete_requirement_rejects_non_current_version(client, auth_headers, db_session, project):
+    v1 = _create_requirement(client, auth_headers, db_session, project.id).json()
     client.delete(f"/requirements/{v1['id']}", headers=auth_headers)
 
     response = client.delete(f"/requirements/{v1['id']}", headers=auth_headers)
@@ -218,10 +234,10 @@ def test_delete_requirement_requires_auth(client, project):
     assert response.status_code == 401
 
 
-def test_list_requirements_excludes_deprecated_by_default(client, auth_headers, project):
-    _create_requirement(client, auth_headers, project.id, title="Active one", status="Active")
+def test_list_requirements_excludes_deprecated_by_default(client, auth_headers, db_session, project):
+    _create_requirement(client, auth_headers, db_session, project.id, title="Active one", status="Active")
     deprecated_resp = _create_requirement(
-        client, auth_headers, project.id, title="Deprecated one", status="Deprecated"
+        client, auth_headers, db_session, project.id, title="Deprecated one", status="Deprecated"
     )
     deprecated = deprecated_resp.json()
 
@@ -254,19 +270,24 @@ def test_create_requirement_denies_without_edit(client, db_session, member_user,
 
     response = client.post(
         "/requirements",
-        json={"title": "T", "description": "d", "project_id": project.id},
+        json={"title": "T", "description": "d", "module_id": 1, "project_id": project.id},
         headers=headers,
     )
     assert response.status_code == 403
 
 
 def test_update_requirement_checks_permission_via_row_lookup(client, db_session, member_user, project, role_by_key):
-    from models.all_models import ProjectMember, Requirement
+    from models.all_models import Module, ProjectMember, Requirement
     from services.code_generator import next_code
+
+    module = Module(project_id=project.id, name="M")
+    db_session.add(module)
+    db_session.commit()
+    db_session.refresh(module)
 
     req = Requirement(
         project_id=project.id, req_id=next_code(db_session, Requirement, "req_id", "REQ"),
-        version=1, title="T", description="d", status="Active", is_current=True,
+        version=1, title="T", description="d", module_id=module.id, status="Active", is_current=True,
     )
     db_session.add(req)
     db_session.commit()
@@ -281,7 +302,46 @@ def test_update_requirement_checks_permission_via_row_lookup(client, db_session,
 
     response = client.put(
         f"/requirements/{req.id}",
-        json={"title": "Updated", "description": "d2", "status": "Active", "change_note": "note"},
+        json={"title": "Updated", "description": "d2", "module_id": module.id, "status": "Active", "change_note": "note"},
         headers=headers,
     )
     assert response.status_code == 200
+
+
+def test_create_requirement_rejects_module_from_another_project(client, auth_headers, db_session, project):
+    from models.all_models import Module, Project
+
+    other_project = Project(name="Other Project 2", description="d", key="OP4")
+    db_session.add(other_project)
+    db_session.commit()
+    db_session.refresh(other_project)
+
+    foreign_module = Module(project_id=other_project.id, name="Foreign")
+    db_session.add(foreign_module)
+    db_session.commit()
+    db_session.refresh(foreign_module)
+
+    response = _create_requirement(client, auth_headers, db_session, project.id, module_id=foreign_module.id)
+    assert response.status_code == 400
+
+
+def test_update_requirement_rejects_module_from_another_project(client, auth_headers, db_session, project):
+    from models.all_models import Module, Project
+
+    v1 = _create_requirement(client, auth_headers, db_session, project.id).json()
+
+    other_project = Project(name="Other Project 3", description="d", key="OP5")
+    db_session.add(other_project)
+    db_session.commit()
+    db_session.refresh(other_project)
+    foreign_module = Module(project_id=other_project.id, name="Foreign2")
+    db_session.add(foreign_module)
+    db_session.commit()
+    db_session.refresh(foreign_module)
+
+    response = client.put(
+        f"/requirements/{v1['id']}",
+        json={"title": "x", "description": "y", "module_id": foreign_module.id, "status": "Draft"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
