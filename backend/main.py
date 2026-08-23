@@ -1,6 +1,11 @@
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from models.all_models import User
+from models.base import SessionLocal
 from routers.auth import router as auth_router
 from routers.projects import router as projects_router
 from routers.releases import router as releases_router
@@ -11,8 +16,38 @@ from routers.defects import router as defects_router
 from routers.traceability import router as traceability_router
 from routers.search import router as search_router
 from routers.roles import router as roles_router
+from routers.users import router as users_router
 
-app = FastAPI(title="QC Suite API")
+
+def ensure_superadmin() -> None:
+    """Grant is_superadmin to SUPERADMIN_EMAIL on every boot.
+
+    The original bootstrap (first-ever registered user becomes superadmin,
+    see routers/auth.py) has no recovery path if that user is ever deleted
+    or the DB is reseeded — the whole system is left with zero superadmins
+    and no UI path to grant one. This reconciles a known-good account on
+    every startup instead of relying on registration order.
+    """
+    email = os.getenv("SUPERADMIN_EMAIL")
+    if not email:
+        return
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if user is not None and not user.is_superadmin:
+            user.is_superadmin = True
+            db.commit()
+    finally:
+        db.close()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    ensure_superadmin()
+    yield
+
+
+app = FastAPI(title="QC Suite API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +67,7 @@ app.include_router(defects_router)
 app.include_router(traceability_router)
 app.include_router(search_router)
 app.include_router(roles_router)
+app.include_router(users_router)
 
 
 @app.get("/health")
