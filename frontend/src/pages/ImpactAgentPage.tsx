@@ -43,11 +43,14 @@ export function ImpactAgentPage() {
 
   const searchRequestId = useRef(0)
   const analyseRequestId = useRef(0)
+  const compareRequestId = useRef(0)
   const prevProjectIdRef = useRef(projectId)
 
   useEffect(() => {
     if (prevProjectIdRef.current === projectId) return
     prevProjectIdRef.current = projectId
+    analyseRequestId.current += 1
+    compareRequestId.current += 1
     setSelectedReq(null)
     setSearchTerm('')
     setSearchResults([])
@@ -78,6 +81,7 @@ export function ImpactAgentPage() {
   }, [project, searchTerm])
 
   function selectRequirement(req: Requirement) {
+    analyseRequestId.current += 1
     setSelectedReq(req)
     setSearchOpen(false)
     setSearchTerm('')
@@ -88,14 +92,22 @@ export function ImpactAgentPage() {
   }
 
   function loadPreviousVersion(req: Requirement) {
+    const requestId = ++compareRequestId.current
     setCompareLoading(true)
     getRequirementHistory(req.req_id)
       .then((history) => {
+        if (compareRequestId.current !== requestId) return
         const prev = history.find((h) => h.version === req.version - 1) ?? null
         setPreviousReq(prev)
       })
-      .catch(() => setPreviousReq(null))
-      .finally(() => setCompareLoading(false))
+      .catch(() => {
+        if (compareRequestId.current !== requestId) return
+        setPreviousReq(null)
+      })
+      .finally(() => {
+        if (compareRequestId.current !== requestId) return
+        setCompareLoading(false)
+      })
   }
 
   function toggleCompare(enabled: boolean) {
@@ -289,8 +301,8 @@ export function ImpactAgentPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {update.source.map((tag) => (
-                      <Badge key={tag} className="bg-muted text-muted-foreground">
+                    {update.source.map((tag, tagIndex) => (
+                      <Badge key={tagIndex} className="bg-muted text-muted-foreground">
                         {tag}
                       </Badge>
                     ))}
@@ -356,8 +368,8 @@ export function ImpactAgentPage() {
                 <p className="font-bold">{q.question}</p>
                 <p className="text-sm text-muted-foreground">{q.why_it_matters}</p>
                 <div className="flex flex-wrap gap-1">
-                  {q.source.map((tag) => (
-                    <Badge key={tag} className="bg-muted text-muted-foreground">
+                  {q.source.map((tag, tagIndex) => (
+                    <Badge key={tagIndex} className="bg-muted text-muted-foreground">
                       {tag}
                     </Badge>
                   ))}
