@@ -77,12 +77,15 @@ def call_gemini_analyse(prompt: str) -> dict:
 
     last_error: Exception | None = None
     for attempt in range(2):
-        response = model.generate_content(prompt)
         try:
+            response = model.generate_content(prompt)
             parsed = _extract_json(response.text)
             validate(instance=parsed, schema=AGENT_CONTRACT_SCHEMA)
             return parsed
         except (json.JSONDecodeError, ValidationError) as exc:
             last_error = exc
             logger.warning("Gemini output failed validation on attempt %s: %s", attempt + 1, exc)
-    raise ValueError(f"Gemini output failed contract validation after retry: {last_error}")
+        except Exception as exc:
+            last_error = exc
+            logger.warning("Gemini call failed on attempt %s: %s", attempt + 1, exc)
+    raise ValueError(f"Gemini call/output failed after retry: {last_error}")

@@ -30,7 +30,11 @@ def gather_context(db: Session, req_id: str) -> dict:
     if req_current.description:
         query_vector = embed(req_current.description, task_type="RETRIEVAL_QUERY")
         distance = TestCase.embedding.cosine_distance(query_vector)
-        related_query = db.query(TestCase).filter(TestCase.embedding.isnot(None))
+        related_query = (
+            db.query(TestCase)
+            .join(Requirement, TestCase.requirement_id == Requirement.id)
+            .filter(TestCase.embedding.isnot(None), Requirement.project_id == req_current.project_id)
+        )
         if linked_ids:
             related_query = related_query.filter(~TestCase.id.in_(linked_ids))
         tc_related = related_query.order_by(distance).limit(10).all()
