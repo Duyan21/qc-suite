@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Impact Analysis Result",
+  "description": "Contract for the JSON returned by POST /agent/analyse (S3-02) and rendered by the Impact Agent page's 3 output sections (S3-05). Defined jointly by An (BE) and Huyen (FE) on Sprint 3 day 1 so both can build in parallel against this exact shape without further coordination.",
+  "type": "object",
+  "required": ["req_id", "version", "summary", "tc_updates", "tc_gaps", "questions"],
+  "properties": {
+    "req_id": {
+      "type": "string",
+      "description": "Required. The requirement code this analysis was run for, e.g. matches requirements.req_id.",
+      "examples": ["REQ-015"]
+    },
+    "version": {
+      "type": "integer",
+      "description": "Required. The requirement version (requirements.version) this analysis was run against.",
+      "examples": [3]
+    },
+    "summary": {
+      "type": "object",
+      "description": "Required. Powers the FE header line: \"Analysed X linked TCs + Y related TCs · Z defects\".",
+      "required": ["linked_tc_count", "related_tc_count", "defect_count"],
+      "properties": {
+        "linked_tc_count": {
+          "type": "integer",
+          "description": "Required. Count of tc_linked (test cases whose requirement_id points at this requirement version).",
+          "examples": [4]
+        },
+        "related_tc_count": {
+          "type": "integer",
+          "description": "Required. Count of tc_related considered (semantic top-10 cap from S3-01).",
+          "examples": [7]
+        },
+        "defect_count": {
+          "type": "integer",
+          "description": "Required. Count of defect_history considered.",
+          "examples": [2]
+        }
+      }
+    },
+    "tc_updates": {
+      "type": "array",
+      "description": "Required, may be empty. FE Section 1 \"TC cần cập nhật\" — existing test cases that likely need editing because of this requirement change.",
+      "items": {
+        "type": "object",
+        "required": ["testcase_id", "code", "title", "reason", "diff", "source"],
+        "properties": {
+          "testcase_id": {
+            "type": "integer",
+            "description": "Required. Powers the FE's \"Open TC\" button, which navigates to /testcases/:id.",
+            "examples": [42]
+          },
+          "code": {
+            "type": "string",
+            "description": "Required. Test case code shown on the card.",
+            "examples": ["TC-102"]
+          },
+          "title": {
+            "type": "string",
+            "description": "Required. Test case title shown on the card.",
+            "examples": ["Login with OTP"]
+          },
+          "reason": {
+            "type": "string",
+            "description": "Required. Why this TC needs updating.",
+            "examples": ["Requirement now requires OTP to expire after 60s, but this TC's expected result assumes no expiry."]
+          },
+          "diff": {
+            "type": "object",
+            "description": "Required. Suggested before/after wording, rendered red (before) / green (after) by the FE.",
+            "required": ["before", "after"],
+            "properties": {
+              "before": {
+                "type": "string",
+                "description": "Required. Current wording to remove.",
+                "examples": ["OTP remains valid until manually resent."]
+              },
+              "after": {
+                "type": "string",
+                "description": "Required. Suggested replacement wording.",
+                "examples": ["OTP expires 60 seconds after issuance."]
+              }
+            }
+          },
+          "source": {
+            "type": "array",
+            "description": "Required, may be empty. Free-text tags citing which context fed this suggestion; rendered as a source tag badge on the card.",
+            "items": { "type": "string" },
+            "examples": [["req_current.description", "tc_linked:TC-102"]]
+          }
+        }
+      }
+    },
+    "tc_gaps": {
+      "type": "array",
+      "description": "Required, may be empty. FE Section 2 \"TC cần thêm mới\" — suggested new test cases not yet covered.",
+      "items": {
+        "type": "object",
+        "required": ["suggested_title", "suggested_scope", "source"],
+        "properties": {
+          "suggested_title": {
+            "type": "string",
+            "description": "Required. Prefills the \"Create TC\" flow's title.",
+            "examples": ["OTP expiry after 60 seconds"]
+          },
+          "suggested_scope": {
+            "type": "string",
+            "description": "Required. What the new TC should cover.",
+            "examples": ["Verify login fails when OTP is submitted after the 60s expiry window."]
+          },
+          "source": {
+            "type": "array",
+            "description": "Required, may be empty. Each entry cites a related item plus its semantic match strength — rendered as \"source tag kèm % match\" on the card.",
+            "items": {
+              "type": "object",
+              "required": ["type", "ref", "match_percent"],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "Required. e.g. \"tc_related\" or \"defect_history\".",
+                  "examples": ["tc_related"]
+                },
+                "ref": {
+                  "type": "string",
+                  "description": "Required. Code of the cited item.",
+                  "examples": ["TC-088"]
+                },
+                "match_percent": {
+                  "type": "number",
+                  "description": "Required. 0-100 semantic match score.",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "examples": [78.5]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "description": "Required, may be empty. FE Section 3 \"Câu hỏi cần xác nhận\" — open questions for a human to confirm.",
+      "items": {
+        "type": "object",
+        "required": ["question", "why_it_matters", "source"],
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "Required. Rendered bold on the card.",
+            "examples": ["Does the 60s OTP expiry apply to the password-reset flow too, or only login?"]
+          },
+          "why_it_matters": {
+            "type": "string",
+            "description": "Required.",
+            "examples": ["If it also applies to password-reset, TC-140 and TC-141 need the same update."]
+          },
+          "source": {
+            "type": "array",
+            "description": "Required, may be empty.",
+            "items": { "type": "string" },
+            "examples": [["req_current.description"]]
+          }
+        }
+      }
+    }
+  }
+}

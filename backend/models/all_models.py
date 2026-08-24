@@ -172,3 +172,12 @@ class TestRunResult(Base):
     testcase_id = Column(Integer, ForeignKey("test_cases.id"), nullable=False)
     result = Column(String(20))
     note = Column(Text)
+
+
+class AgentCache(Base):
+    __tablename__ = "agent_cache"
+
+    id = Column(Integer, primary_key=True)
+    cache_key = Column(String(64), unique=True, nullable=False)
+    result_json = Column(Text, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())

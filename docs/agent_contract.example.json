@@ -1,0 +1,34 @@
+{
+  "req_id": "REQ-015",
+  "version": 3,
+  "summary": { "linked_tc_count": 2, "related_tc_count": 3, "defect_count": 1 },
+  "tc_updates": [
+    {
+      "testcase_id": 102,
+      "code": "TC-102",
+      "title": "Login with OTP",
+      "reason": "Requirement now requires OTP to expire after 60s, but this TC's expected result assumes no expiry.",
+      "diff": {
+        "before": "OTP remains valid until manually resent.",
+        "after": "OTP expires 60 seconds after issuance."
+      },
+      "source": ["req_current.description", "tc_linked:TC-102"]
+    }
+  ],
+  "tc_gaps": [
+    {
+      "suggested_title": "OTP expiry after 60 seconds",
+      "suggested_scope": "Verify login fails when OTP is submitted after the 60s expiry window.",
+      "source": [
+        { "type": "tc_related", "ref": "TC-088", "match_percent": 78.5 }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "question": "Does the 60s OTP expiry apply to the password-reset flow too, or only login?",
+      "why_it_matters": "If it also applies to password-reset, TC-140 and TC-141 need the same update.",
+      "source": ["req_current.description"]
+    }
+  ]
+}

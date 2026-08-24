@@ -152,8 +152,8 @@ export function AppLayout() {
 
   return (
     <CurrentProjectProvider>
-      <div className="flex min-h-svh flex-col md:flex-row">
-        <header className="dark flex items-center gap-2.5 border-b border-sidebar-border bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden">
+      <div className="flex h-svh flex-col overflow-hidden md:flex-row">
+        <header className="dark sticky top-0 z-30 flex shrink-0 items-center gap-2.5 border-b border-sidebar-border bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden">
           <Button
             type="button"
             variant="ghost"
@@ -187,7 +187,7 @@ export function AppLayout() {
           {sidebarContent}
         </aside>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden p-4 md:p-6">
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6">
           <Outlet />
         </main>
       </div>
