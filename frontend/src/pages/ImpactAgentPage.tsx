@@ -424,7 +424,6 @@ export function ImpactAgentPage() {
                             prefill: {
                               title: gap.suggested_title,
                               steps: gap.suggested_scope,
-                              expectedResult: gap.suggested_scope,
                               requirement: selectedReq,
                             },
                           },
