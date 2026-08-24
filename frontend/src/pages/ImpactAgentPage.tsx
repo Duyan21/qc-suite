@@ -429,11 +429,13 @@ export function ImpactAgentPage() {
                 <p className="font-bold">{q.question}</p>
                 <p className="text-sm text-muted-foreground">{q.why_it_matters}</p>
                 <div className="flex flex-wrap gap-1">
-                  {q.source.map((tag, tagIndex) => (
-                    <Badge key={tagIndex} className="bg-muted text-muted-foreground">
-                      {humanizeSourceTag(tag)}
-                    </Badge>
-                  ))}
+                  {q.source
+                    .filter((tag) => tag !== 'req_current.description')
+                    .map((tag, tagIndex) => (
+                      <Badge key={tagIndex} className="bg-muted text-muted-foreground">
+                        {humanizeSourceTag(tag)}
+                      </Badge>
+                    ))}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => copyQuestion(q.question, index)}>
                   {copiedIndex === index ? <Check className="size-4" /> : <Copy className="size-4" />}
