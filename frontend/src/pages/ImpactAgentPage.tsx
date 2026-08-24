@@ -174,13 +174,13 @@ export function ImpactAgentPage() {
     setDraftDescription('')
   }
 
-  function runAnalysis() {
+  function runAnalysis(force = false) {
     if (!selectedReq) return
     const requestId = ++analyseRequestId.current
     setAnalysing(true)
     setAnalysisError(null)
     const proposed = draftDescription.trim()
-    analyseRequirementImpact(selectedReq.req_id, proposed || undefined)
+    analyseRequirementImpact(selectedReq.req_id, proposed || undefined, force)
       .then((res) => {
         if (analyseRequestId.current !== requestId) return
         setResult(res)
@@ -316,11 +316,23 @@ export function ImpactAgentPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button type="button" onClick={runAnalysis} disabled={analysing}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" onClick={() => runAnalysis()} disabled={analysing}>
                 {analysing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                 {analysing ? 'Đang phân tích... (~5–8 giây)' : 'Analyse Impact'}
               </Button>
+              {result && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runAnalysis(true)}
+                  disabled={analysing}
+                  title="Bỏ qua kết quả đã lưu và phân tích lại từ đầu — dùng khi bạn vừa sửa test case liên quan"
+                >
+                  Phân tích lại (bỏ qua cache)
+                </Button>
+              )}
               {import.meta.env.DEV && (
                 <Button type="button" variant="ghost" size="sm" onClick={loadDemoData}>
                   Load demo data
@@ -331,7 +343,7 @@ export function ImpactAgentPage() {
             {analysisError && (
               <div className="flex items-center gap-3">
                 <p className="text-sm text-destructive">{analysisError}</p>
-                <Button size="sm" variant="outline" onClick={runAnalysis}>
+                <Button size="sm" variant="outline" onClick={() => runAnalysis()}>
                   Thử lại
                 </Button>
               </div>

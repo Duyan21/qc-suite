@@ -37,10 +37,11 @@ def analyse_requirement_impact(
     cache_key = None
     if proposed_description is None:
         cache_key = make_cache_key(req_current.req_id, req_current.version)
-        cached = get_cached_result(db, cache_key)
-        if cached is not None:
-            response.headers["X-Cache"] = "HIT"
-            return AgentAnalysisResponse(**cached)
+        if not payload.force:
+            cached = get_cached_result(db, cache_key)
+            if cached is not None:
+                response.headers["X-Cache"] = "HIT"
+                return AgentAnalysisResponse(**cached)
 
     context = gather_context(db, payload.req_id, proposed_description=proposed_description)
     logger.info("agent analyse token estimate for %s: %s", payload.req_id, estimate_token_count(context))

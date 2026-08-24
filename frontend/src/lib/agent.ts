@@ -43,10 +43,11 @@ export type AgentAnalysisResult = {
 export async function analyseRequirementImpact(
   reqId: string,
   proposedDescription?: string,
+  force?: boolean,
 ): Promise<AgentAnalysisResult> {
   return authFetch<AgentAnalysisResult>('/agent/analyse', {
     method: 'POST',
-    body: { req_id: reqId, proposed_description: proposedDescription || undefined },
+    body: { req_id: reqId, proposed_description: proposedDescription || undefined, force: force || undefined },
   })
 }
 

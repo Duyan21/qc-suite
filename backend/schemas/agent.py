@@ -4,6 +4,7 @@ from pydantic import BaseModel
 class AgentAnalyseRequest(BaseModel):
     req_id: str
     proposed_description: str | None = None
+    force: bool = False
 
 
 class AgentSummary(BaseModel):
