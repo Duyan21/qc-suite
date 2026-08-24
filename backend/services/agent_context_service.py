@@ -4,7 +4,7 @@ from models.all_models import Defect, Requirement, TestCase
 from services.embedding_service import embed
 
 
-def gather_context(db: Session, req_id: str) -> dict:
+def gather_context(db: Session, req_id: str, proposed_description: str | None = None) -> dict:
     req_current = (
         db.query(Requirement)
         .filter(Requirement.req_id == req_id, Requirement.is_current == True)
@@ -13,9 +13,11 @@ def gather_context(db: Session, req_id: str) -> dict:
     if req_current is None:
         raise ValueError(f"No current version found for req_id={req_id}")
 
+    proposed_description = proposed_description.strip() if proposed_description else None
+
     req_previous = (
         db.get(Requirement, req_current.previous_version_id)
-        if req_current.previous_version_id is not None
+        if req_current.previous_version_id is not None and not proposed_description
         else None
     )
 
@@ -27,8 +29,9 @@ def gather_context(db: Session, req_id: str) -> dict:
     linked_ids = {tc.id for tc in tc_linked}
 
     tc_related: list[TestCase] = []
-    if req_current.description:
-        query_vector = embed(req_current.description, task_type="RETRIEVAL_QUERY")
+    search_text = proposed_description or req_current.description
+    if search_text:
+        query_vector = embed(search_text, task_type="RETRIEVAL_QUERY")
         distance = TestCase.embedding.cosine_distance(query_vector)
         related_query = (
             db.query(TestCase)
@@ -48,6 +51,7 @@ def gather_context(db: Session, req_id: str) -> dict:
     return {
         "req_current": req_current,
         "req_previous": req_previous,
+        "proposed_description": proposed_description,
         "tc_linked": tc_linked,
         "tc_related": tc_related,
         "defect_history": defect_history,
@@ -64,6 +68,8 @@ def estimate_token_count(context: dict) -> int:
         if req is not None:
             parts.append(req.title)
             parts.append(req.description)
+    if context.get("proposed_description"):
+        parts.append(context["proposed_description"])
     for tc in [*context["tc_linked"], *context["tc_related"]]:
         parts.extend([tc.title, tc.preconditions or "", tc.steps or "", tc.expected_result])
     for defect in context["defect_history"]:

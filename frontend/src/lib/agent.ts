@@ -40,10 +40,13 @@ export type AgentAnalysisResult = {
   questions: AgentQuestion[]
 }
 
-export async function analyseRequirementImpact(reqId: string): Promise<AgentAnalysisResult> {
+export async function analyseRequirementImpact(
+  reqId: string,
+  proposedDescription?: string,
+): Promise<AgentAnalysisResult> {
   return authFetch<AgentAnalysisResult>('/agent/analyse', {
     method: 'POST',
-    body: { req_id: reqId },
+    body: { req_id: reqId, proposed_description: proposedDescription || undefined },
   })
 }
 

@@ -33,13 +33,16 @@ def analyse_requirement_impact(
         raise HTTPException(status_code=404, detail="Requirement not found")
     check_permission(db, current_user, req_current.project_id, PermissionArea.AI_TOOLS, PermissionLevel.READ)
 
-    cache_key = make_cache_key(req_current.req_id, req_current.version)
-    cached = get_cached_result(db, cache_key)
-    if cached is not None:
-        response.headers["X-Cache"] = "HIT"
-        return AgentAnalysisResponse(**cached)
+    proposed_description = (payload.proposed_description or "").strip() or None
+    cache_key = None
+    if proposed_description is None:
+        cache_key = make_cache_key(req_current.req_id, req_current.version)
+        cached = get_cached_result(db, cache_key)
+        if cached is not None:
+            response.headers["X-Cache"] = "HIT"
+            return AgentAnalysisResponse(**cached)
 
-    context = gather_context(db, payload.req_id)
+    context = gather_context(db, payload.req_id, proposed_description=proposed_description)
     logger.info("agent analyse token estimate for %s: %s", payload.req_id, estimate_token_count(context))
     prompt = build_prompt(context)
     try:
@@ -54,7 +57,17 @@ def analyse_requirement_impact(
         "related_tc_count": len(context["tc_related"]),
         "defect_count": len(context["defect_history"]),
     }
-    store_result(db, cache_key, result)
+
+    # Gemini is only ever shown each TC's code, not its DB id (see _tc_summary), so it
+    # can only guess at testcase_id — pin it back to the real id by code so "Open TC"
+    # navigates correctly instead of 404ing on a hallucinated id.
+    code_to_id = {tc.code: tc.id for tc in [*context["tc_linked"], *context["tc_related"]]}
+    for update in result.get("tc_updates", []):
+        real_id = code_to_id.get(update.get("code"))
+        if real_id is not None:
+            update["testcase_id"] = real_id
 
     response.headers["X-Cache"] = "MISS"
+    if cache_key is not None:
+        store_result(db, cache_key, result)
     return AgentAnalysisResponse(**result)

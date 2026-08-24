@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, Copy, Loader2, Search as SearchIcon, Sparkles } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,57 +10,118 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useCurrentProject } from '@/lib/currentProject'
-import {
-  getRequirementHistory,
-  listRequirements,
-  type Requirement,
-} from '@/lib/requirements'
+import { listRequirements, type Requirement } from '@/lib/requirements'
 import {
   analyseRequirementImpact,
   MOCK_ANALYSIS_RESULT,
   type AgentAnalysisResult,
 } from '@/lib/agent'
 
+const STORAGE_KEY = 'qms_impact_agent_state_v1'
+
+type PersistedState = {
+  selectedReq: Requirement | null
+  compareEnabled: boolean
+  draftDescription: string
+  result: AgentAnalysisResult | null
+  dismissedUpdates: number[]
+  dismissedGaps: number[]
+}
+
+function loadPersisted(): PersistedState | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as PersistedState) : null
+  } catch {
+    return null
+  }
+}
+
+function savePersisted(state: PersistedState) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // storage unavailable (private mode, quota) — input just won't persist
+  }
+}
+
+function clearPersisted() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 export function ImpactAgentPage() {
   const { project } = useCurrentProject()
   const navigate = useNavigate()
   const projectId = project?.id ?? null
+  const initial = useMemo(loadPersisted, [])
 
   const [searchTerm, setSearchTerm] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchResults, setSearchResults] = useState<Requirement[]>([])
-  const [selectedReq, setSelectedReq] = useState<Requirement | null>(null)
+  const [selectedReq, setSelectedReq] = useState<Requirement | null>(initial?.selectedReq ?? null)
 
-  const [compareEnabled, setCompareEnabled] = useState(false)
-  const [previousReq, setPreviousReq] = useState<Requirement | null>(null)
-  const [compareLoading, setCompareLoading] = useState(false)
+  const [compareEnabled, setCompareEnabled] = useState(initial?.compareEnabled ?? false)
+  const [draftDescription, setDraftDescription] = useState(initial?.draftDescription ?? '')
 
   const [analysing, setAnalysing] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
-  const [result, setResult] = useState<AgentAnalysisResult | null>(null)
-  const [dismissedUpdates, setDismissedUpdates] = useState<Set<number>>(new Set())
-  const [dismissedGaps, setDismissedGaps] = useState<Set<number>>(new Set())
+  const [result, setResult] = useState<AgentAnalysisResult | null>(initial?.result ?? null)
+  const [dismissedUpdates, setDismissedUpdates] = useState<Set<number>>(
+    new Set(initial?.dismissedUpdates ?? []),
+  )
+  const [dismissedGaps, setDismissedGaps] = useState<Set<number>>(new Set(initial?.dismissedGaps ?? []))
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
 
   const searchRequestId = useRef(0)
   const analyseRequestId = useRef(0)
-  const compareRequestId = useRef(0)
   const prevProjectIdRef = useRef(projectId)
+
+  useEffect(() => {
+    savePersisted({
+      selectedReq,
+      compareEnabled,
+      draftDescription,
+      result,
+      dismissedUpdates: Array.from(dismissedUpdates),
+      dismissedGaps: Array.from(dismissedGaps),
+    })
+  }, [selectedReq, compareEnabled, draftDescription, result, dismissedUpdates, dismissedGaps])
 
   useEffect(() => {
     if (prevProjectIdRef.current === projectId) return
     prevProjectIdRef.current = projectId
     searchRequestId.current += 1
     analyseRequestId.current += 1
-    compareRequestId.current += 1
     setSelectedReq(null)
     setSearchTerm('')
     setSearchResults([])
     setCompareEnabled(false)
-    setPreviousReq(null)
+    setDraftDescription('')
     setResult(null)
     setAnalysisError(null)
+    setDismissedUpdates(new Set())
+    setDismissedGaps(new Set())
+    clearPersisted()
   }, [projectId])
+
+  function resetInput() {
+    searchRequestId.current += 1
+    analyseRequestId.current += 1
+    setSearchTerm('')
+    setSearchResults([])
+    setSelectedReq(null)
+    setCompareEnabled(false)
+    setDraftDescription('')
+    setResult(null)
+    setAnalysisError(null)
+    setDismissedUpdates(new Set())
+    setDismissedGaps(new Set())
+    clearPersisted()
+  }
 
   useEffect(() => {
     if (!project || searchTerm.trim().length < 2) {
@@ -84,42 +146,12 @@ export function ImpactAgentPage() {
 
   function selectRequirement(req: Requirement) {
     analyseRequestId.current += 1
-    compareRequestId.current += 1
     setSelectedReq(req)
     setSearchOpen(false)
     setSearchTerm('')
     setResult(null)
     setAnalysisError(null)
-    setPreviousReq(null)
-    if (compareEnabled) loadPreviousVersion(req)
-  }
-
-  function loadPreviousVersion(req: Requirement) {
-    const requestId = ++compareRequestId.current
-    setCompareLoading(true)
-    getRequirementHistory(req.req_id)
-      .then((history) => {
-        if (compareRequestId.current !== requestId) return
-        const prev = history.find((h) => h.version === req.version - 1) ?? null
-        setPreviousReq(prev)
-      })
-      .catch(() => {
-        if (compareRequestId.current !== requestId) return
-        setPreviousReq(null)
-      })
-      .finally(() => {
-        if (compareRequestId.current !== requestId) return
-        setCompareLoading(false)
-      })
-  }
-
-  function toggleCompare(enabled: boolean) {
-    setCompareEnabled(enabled)
-    if (enabled && selectedReq) loadPreviousVersion(selectedReq)
-    if (!enabled) {
-      compareRequestId.current += 1
-      setPreviousReq(null)
-    }
+    setDraftDescription('')
   }
 
   function runAnalysis() {
@@ -127,7 +159,8 @@ export function ImpactAgentPage() {
     const requestId = ++analyseRequestId.current
     setAnalysing(true)
     setAnalysisError(null)
-    analyseRequirementImpact(selectedReq.req_id)
+    const proposed = draftDescription.trim()
+    analyseRequirementImpact(selectedReq.req_id, proposed || undefined)
       .then((res) => {
         if (analyseRequestId.current !== requestId) return
         setResult(res)
@@ -181,78 +214,87 @@ export function ImpactAgentPage() {
       </div>
 
       <Card className="flex flex-col gap-3 p-4">
-        <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full justify-start sm:max-w-md"
-              disabled={!project}
-            >
-              <SearchIcon className="size-4" />
-              {selectedReq ? `${selectedReq.req_id} — ${selectedReq.title}` : 'Chọn requirement theo code hoặc title...'}
+        <div className="flex flex-wrap items-center gap-2">
+          <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start sm:max-w-md"
+                disabled={!project}
+              >
+                <SearchIcon className="size-4" />
+                {selectedReq ? `${selectedReq.req_id} — ${selectedReq.title}` : 'Chọn requirement theo code hoặc title...'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-2 sm:w-96">
+              <Input
+                autoFocus
+                placeholder="Tìm theo code hoặc title..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <div className="mt-2 flex max-h-64 flex-col gap-1 overflow-y-auto">
+                {searchTerm.trim().length < 2 && (
+                  <p className="px-2 py-1 text-sm text-muted-foreground">Gõ ít nhất 2 ký tự.</p>
+                )}
+                {searchTerm.trim().length >= 2 && searchResults.length === 0 && (
+                  <p className="px-2 py-1 text-sm text-muted-foreground">Không tìm thấy requirement.</p>
+                )}
+                {searchResults.map((req) => (
+                  <button
+                    key={req.id}
+                    type="button"
+                    onClick={() => selectRequirement(req)}
+                    className="rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                  >
+                    <span className="font-mono text-primary">{req.req_id}</span>{' '}
+                    <span>{req.title}</span>
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {(selectedReq || searchTerm) && (
+            <Button type="button" variant="ghost" size="sm" onClick={resetInput}>
+              Reset
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-full p-2 sm:w-96">
-            <Input
-              autoFocus
-              placeholder="Tìm theo code hoặc title..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <div className="mt-2 flex max-h-64 flex-col gap-1 overflow-y-auto">
-              {searchTerm.trim().length < 2 && (
-                <p className="px-2 py-1 text-sm text-muted-foreground">Gõ ít nhất 2 ký tự.</p>
-              )}
-              {searchTerm.trim().length >= 2 && searchResults.length === 0 && (
-                <p className="px-2 py-1 text-sm text-muted-foreground">Không tìm thấy requirement.</p>
-              )}
-              {searchResults.map((req) => (
-                <button
-                  key={req.id}
-                  type="button"
-                  onClick={() => selectRequirement(req)}
-                  className="rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
-                >
-                  <span className="font-mono text-primary">{req.req_id}</span>{' '}
-                  <span>{req.title}</span>
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+          )}
+        </div>
 
         {!project && <p className="text-sm text-muted-foreground">Vui lòng chọn một dự án.</p>}
 
         {selectedReq && (
           <>
             <div className="flex items-center gap-2">
-              <Switch checked={compareEnabled} onCheckedChange={toggleCompare} id="compare-toggle" />
+              <Switch checked={compareEnabled} onCheckedChange={setCompareEnabled} id="compare-toggle" />
               <label htmlFor="compare-toggle" className="text-sm">
-                So sánh với version trước
+                Hiện nội dung hiện tại để so sánh
               </label>
             </div>
 
-            {!compareEnabled && (
-              <Textarea readOnly value={selectedReq.description} className="min-h-32" />
-            )}
-
-            {compareEnabled && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className={cn('grid grid-cols-1 gap-3', compareEnabled && 'sm:grid-cols-2')}>
+              {compareEnabled && (
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">
-                    {previousReq ? `Version ${previousReq.version} (cũ)` : compareLoading ? 'Đang tải...' : 'Không có version trước'}
-                  </p>
-                  <Textarea readOnly value={previousReq?.description ?? ''} className="min-h-32" />
-                </div>
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">
-                    Version {selectedReq.version} (mới)
+                    Version {selectedReq.version} (hiện tại, chưa thay đổi)
                   </p>
                   <Textarea readOnly value={selectedReq.description} className="min-h-32" />
                 </div>
+              )}
+              <div>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  Nội dung đề xuất thay đổi (để trống nếu chỉ phân tích nội dung hiện tại)
+                </p>
+                <Textarea
+                  value={draftDescription}
+                  onChange={(e) => setDraftDescription(e.target.value)}
+                  placeholder="Nhập nội dung requirement mới để phân tích ảnh hưởng..."
+                  className="min-h-32"
+                />
               </div>
-            )}
+            </div>
 
             <div className="flex items-center gap-2">
               <Button type="button" onClick={runAnalysis} disabled={analysing}>
