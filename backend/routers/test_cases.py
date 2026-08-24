@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.all_models import Project, Release, Requirement, TestCase, TestRun, TestRunResult, User
@@ -17,7 +18,7 @@ from schemas.test_cases import (
     TestCaseUpdate,
 )
 from services.auth_service import get_current_user
-from services.code_generator import next_code
+from services.code_generator import extract_number_suffix, next_child_code
 from services.embedding_service import embed_and_store
 from services.permissions import PermissionArea, PermissionLevel, check_permission, permitted_project_ids
 
@@ -103,18 +104,33 @@ def create_test_case(
         raise HTTPException(status_code=400, detail="requirement_id not found")
     check_permission(db, current_user, requirement.project_id, PermissionArea.TEST_CASES, PermissionLevel.EDIT)
 
-    code = next_code(db, TestCase, "code", "TC")
-    tc = TestCase(
-        code=code,
-        title=payload.title,
-        preconditions=payload.preconditions,
-        steps=payload.steps,
-        expected_result=payload.expected_result,
-        priority=payload.priority,
-        requirement_id=payload.requirement_id,
-    )
-    db.add(tc)
-    db.commit()
+    req_number = extract_number_suffix(requirement.req_id) or "000"
+
+    max_attempts = 5
+    for attempt in range(max_attempts):
+        code = next_child_code(db, TestCase, "code", "TC", req_number)
+        tc = TestCase(
+            code=code,
+            title=payload.title,
+            preconditions=payload.preconditions,
+            steps=payload.steps,
+            expected_result=payload.expected_result,
+            priority=payload.priority,
+            requirement_id=payload.requirement_id,
+        )
+        db.add(tc)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            if attempt == max_attempts - 1:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Could not generate a unique test case code, please retry",
+                )
+            continue
+        else:
+            break
     db.refresh(tc)
     background_tasks.add_task(embed_and_store, db, tc.id)
     return tc

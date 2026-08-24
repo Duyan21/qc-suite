@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Plus, Trash2 } from 'lucide-react'
 import { Card, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,14 @@ import {
 import { NewTestCaseDialog } from '@/components/NewTestCaseDialog'
 import { DeleteTestCaseDialog } from '@/components/DeleteTestCaseDialog'
 import { useToast } from '@/lib/toast'
+import type { RequirementSummary } from '@/lib/requirements'
+
+type NewTestCasePrefill = {
+  title?: string
+  steps?: string
+  expectedResult?: string
+  requirement?: RequirementSummary | null
+}
 
 const PAGE_SIZE = 20
 const STATUS_OPTIONS: TestCaseStatus[] = ['Draft', 'Active', 'Deprecated']
@@ -44,7 +52,10 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 export function TestCasesPage() {
   const { project } = useCurrentProject()
   const toast = useToast()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [newOpen, setNewOpen] = useState(false)
+  const [newPrefill, setNewPrefill] = useState<NewTestCasePrefill | null>(null)
   const [deletingTestCase, setDeletingTestCase] = useState<{ id: number; code: string } | null>(null)
   const [data, setData] = useState<TestCaseListResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -55,6 +66,17 @@ export function TestCasesPage() {
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
   const requestIdRef = useRef(0)
+
+  useEffect(() => {
+    const state = location.state as { openNewTestCase?: boolean; prefill?: NewTestCasePrefill } | null
+    if (state?.openNewTestCase) {
+      setNewPrefill(state.prefill ?? null)
+      setNewOpen(true)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+    // Only meant to run once, when arriving via a "Create TC" navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     setPage(1)
@@ -278,8 +300,15 @@ export function TestCasesPage() {
       {project && (
         <NewTestCaseDialog
           open={newOpen}
-          onOpenChange={setNewOpen}
+          onOpenChange={(open) => {
+            setNewOpen(open)
+            if (!open) setNewPrefill(null)
+          }}
           projectId={project.id}
+          lockedRequirement={newPrefill?.requirement ?? undefined}
+          initialTitle={newPrefill?.title}
+          initialSteps={newPrefill?.steps}
+          initialExpectedResult={newPrefill?.expectedResult}
           onCreated={(tc) => {
             load(project.id, page, statusFilter, priorityFilter, debouncedSearch)
             toast.success(`Đã tạo test case ${tc.code}.`, {
