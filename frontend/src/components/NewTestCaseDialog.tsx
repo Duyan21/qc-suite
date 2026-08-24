@@ -27,6 +27,9 @@ type NewTestCaseDialogProps = {
   onOpenChange: (open: boolean) => void
   projectId: number
   lockedRequirement?: RequirementSummary | null
+  initialTitle?: string
+  initialSteps?: string
+  initialExpectedResult?: string
   onCreated: (testCase: TestCase) => void
 }
 
@@ -35,6 +38,9 @@ export function NewTestCaseDialog({
   onOpenChange,
   projectId,
   lockedRequirement,
+  initialTitle,
+  initialSteps,
+  initialExpectedResult,
   onCreated,
 }: NewTestCaseDialogProps) {
   const [submitting, setSubmitting] = useState(false)
@@ -101,6 +107,7 @@ export function NewTestCaseDialog({
                 id="new-tc-title"
                 name="title"
                 required
+                defaultValue={initialTitle}
                 placeholder="Nhập tiêu đề test case..."
               />
             </div>
@@ -133,6 +140,7 @@ export function NewTestCaseDialog({
                 id="new-tc-steps"
                 name="steps"
                 rows={3}
+                defaultValue={initialSteps}
                 placeholder={'1. Mở trang đăng nhập\n2. Nhập email/mật khẩu\n3. Nhấn Đăng nhập'}
               />
             </div>
@@ -143,6 +151,7 @@ export function NewTestCaseDialog({
                 name="expected_result"
                 required
                 rows={3}
+                defaultValue={initialExpectedResult}
                 placeholder="Người dùng được chuyển tới trang Dashboard"
               />
             </div>

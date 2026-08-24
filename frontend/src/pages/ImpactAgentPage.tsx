@@ -415,7 +415,22 @@ export function ImpactAgentPage() {
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => navigate('/testcases')}>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        navigate('/testcases', {
+                          state: {
+                            openNewTestCase: true,
+                            prefill: {
+                              title: gap.suggested_title,
+                              steps: gap.suggested_scope,
+                              expectedResult: gap.suggested_scope,
+                              requirement: selectedReq,
+                            },
+                          },
+                        })
+                      }
+                    >
                       Create TC
                     </Button>
                     <Button
