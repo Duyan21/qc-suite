@@ -98,11 +98,15 @@ export function NewTestCaseDialog({
             <DialogTitle>Test Case mới</DialogTitle>
             <DialogDescription>
               Tạo một test case mới{lockedRequirement ? ` cho ${lockedRequirement.req_id}` : ''}.
+              {' '}
+              <span className="text-destructive">*</span> Bắt buộc.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-tc-title">Tiêu đề</Label>
+              <Label htmlFor="new-tc-title">
+                Tiêu đề <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="new-tc-title"
                 name="title"
@@ -112,7 +116,9 @@ export function NewTestCaseDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Requirement</Label>
+              <Label>
+                Requirement <span className="text-destructive">*</span>
+              </Label>
               {lockedRequirement ? (
                 <p className="text-sm text-muted-foreground">
                   {lockedRequirement.req_id} — {lockedRequirement.title}
@@ -145,7 +151,9 @@ export function NewTestCaseDialog({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-tc-expected">Kết quả mong đợi</Label>
+              <Label htmlFor="new-tc-expected">
+                Kết quả mong đợi <span className="text-destructive">*</span>
+              </Label>
               <Textarea
                 id="new-tc-expected"
                 name="expected_result"
