@@ -17,6 +17,26 @@ import {
   type AgentAnalysisResult,
 } from '@/lib/agent'
 
+// Provenance tags cited by the AI (e.g. "tc_linked:TC-102", "req_current.description")
+// are intentional — they show which context grounded a suggestion, for QA traceability —
+// but the raw internal keys read poorly, so map known prefixes to a readable label.
+const SOURCE_LABELS: Record<string, string> = {
+  tc_related: 'TC related',
+  tc_linked: 'TC linked',
+  defect_history: 'Defect history',
+  req_current: 'Current requirement',
+  req_previous: 'Previous requirement',
+  req_new: 'Proposed requirement',
+}
+
+function humanizeSourceTag(raw: string): string {
+  const separatorIndex = raw.search(/[.:]/)
+  const prefix = separatorIndex === -1 ? raw : raw.slice(0, separatorIndex)
+  const rest = separatorIndex === -1 ? '' : raw.slice(separatorIndex + 1)
+  const label = SOURCE_LABELS[prefix] ?? prefix.replace(/_/g, ' ')
+  return rest ? `${label}: ${rest}` : label
+}
+
 const STORAGE_KEY = 'qms_impact_agent_state_v1'
 
 type PersistedState = {
@@ -348,13 +368,6 @@ export function ImpactAgentPage() {
                       {update.diff.after}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {update.source.map((tag, tagIndex) => (
-                      <Badge key={tagIndex} className="bg-muted text-muted-foreground">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => navigate(`/testcases/${update.testcase_id}`)}>
                       Open TC
@@ -385,7 +398,7 @@ export function ImpactAgentPage() {
                   <div className="flex flex-wrap gap-1">
                     {gap.source.map((src, srcIndex) => (
                       <Badge key={srcIndex} className="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
-                        {src.type}:{src.ref} · {Math.round(src.match_percent)}% match
+                        {humanizeSourceTag(src.type)}: {src.ref} · {Math.round(src.match_percent)}% match
                       </Badge>
                     ))}
                   </div>
@@ -418,7 +431,7 @@ export function ImpactAgentPage() {
                 <div className="flex flex-wrap gap-1">
                   {q.source.map((tag, tagIndex) => (
                     <Badge key={tagIndex} className="bg-muted text-muted-foreground">
-                      {tag}
+                      {humanizeSourceTag(tag)}
                     </Badge>
                   ))}
                 </div>
