@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean,
+    Column, Integer, String, Text, Boolean, Date,
     ForeignKey, TIMESTAMP, UniqueConstraint, Index, func
 )
 from pgvector.sqlalchemy import Vector
@@ -76,6 +76,9 @@ class Release(Base):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     version_name = Column(String(50), nullable=False)
     note = Column(Text)
+    status = Column(String(20), default="New")
+    target_date = Column(Date, nullable=True)
+    owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 
@@ -151,27 +154,38 @@ class Defect(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 
-class TestRun(Base):
-    __tablename__ = "test_runs"
-
-    id = Column(Integer, primary_key=True)
-    release_id = Column(Integer, ForeignKey("releases.id"), nullable=False)
-    executed_at = Column(TIMESTAMP, server_default=func.now())
-    executed_by = Column(String(100))
-    note = Column(Text)
-
-
-class TestRunResult(Base):
-    __tablename__ = "test_run_results"
+class ReleaseTestCase(Base):
+    __tablename__ = "release_test_cases"
     __table_args__ = (
-        UniqueConstraint("run_id", "testcase_id", name="uq_run_testcase"),
+        UniqueConstraint("release_id", "testcase_id", name="uq_release_testcase"),
     )
 
     id = Column(Integer, primary_key=True)
-    run_id = Column(Integer, ForeignKey("test_runs.id"), nullable=False)
+    release_id = Column(Integer, ForeignKey("releases.id"), nullable=False)
     testcase_id = Column(Integer, ForeignKey("test_cases.id"), nullable=False)
-    result = Column(String(20))
+    current_result = Column(String(10), default="NotRun")
+    added_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    added_at = Column(TIMESTAMP, server_default=func.now())
+
+
+class ReleaseTestCaseExecution(Base):
+    __tablename__ = "release_test_case_executions"
+
+    id = Column(Integer, primary_key=True)
+    release_test_case_id = Column(Integer, ForeignKey("release_test_cases.id"), nullable=False)
+    result = Column(String(10), nullable=False)
     note = Column(Text)
+    executed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    executed_at = Column(TIMESTAMP, server_default=func.now())
+
+
+class ExecutionEvidenceImage(Base):
+    __tablename__ = "execution_evidence_images"
+
+    id = Column(Integer, primary_key=True)
+    execution_id = Column(Integer, ForeignKey("release_test_case_executions.id"), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    uploaded_at = Column(TIMESTAMP, server_default=func.now())
 
 
 class AgentCache(Base):
