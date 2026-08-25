@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from services.evidence_storage import UPLOADS_DIR
 
 from models.all_models import User
 from models.base import SessionLocal
@@ -71,6 +73,9 @@ app.include_router(roles_router)
 app.include_router(users_router)
 app.include_router(modules_router)
 app.include_router(agent_router)
+
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 
 @app.get("/health")
