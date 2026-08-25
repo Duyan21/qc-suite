@@ -1,4 +1,4 @@
-from models.all_models import Release, Requirement, TestCase, TestRun, TestRunResult
+from models.all_models import Release, Requirement, TestCase
 from services.code_generator import next_code
 
 
@@ -38,14 +38,20 @@ def _create_test_case(db_session, requirement_id, **overrides):
 
 
 def _create_run_result(db_session, release_id, testcase_id, result, **overrides):
-    run = TestRun(release_id=release_id, executed_by="An")
-    db_session.add(run)
-    db_session.commit()
-    db_session.refresh(run)
+    from models.all_models import ReleaseTestCase, ReleaseTestCaseExecution
 
-    defaults = dict(run_id=run.id, testcase_id=testcase_id, result=result)
+    rtc = db_session.query(ReleaseTestCase).filter(
+        ReleaseTestCase.release_id == release_id, ReleaseTestCase.testcase_id == testcase_id
+    ).first()
+    if rtc is None:
+        rtc = ReleaseTestCase(release_id=release_id, testcase_id=testcase_id, current_result=result)
+        db_session.add(rtc)
+        db_session.commit()
+        db_session.refresh(rtc)
+
+    defaults = dict(release_test_case_id=rtc.id, result=result)
     defaults.update(overrides)
-    row = TestRunResult(**defaults)
+    row = ReleaseTestCaseExecution(**defaults)
     db_session.add(row)
     db_session.commit()
     db_session.refresh(row)
@@ -104,7 +110,7 @@ def test_traceability_status_mapping_and_coverage_percent(client, auth_headers, 
     assert statuses[tc_never_run.code] == "not_run"
 
 
-def test_traceability_returns_run_id_and_executed_at(client, auth_headers, project, db_session):
+def test_traceability_returns_execution_id_and_executed_at(client, auth_headers, project, db_session):
     req = _create_requirement(db_session, project.id)
     tc = _create_test_case(db_session, req.id)
     release = Release(project_id=project.id, version_name="v1.0.0")
@@ -116,7 +122,7 @@ def test_traceability_returns_run_id_and_executed_at(client, auth_headers, proje
 
     response = client.get(f"/traceability?project_id={project.id}", headers=auth_headers)
     item = response.json()["items"][0]["test_cases"][0]
-    assert item["run_id"] == result_row.run_id
+    assert item["execution_id"] == result_row.id
     assert item["executed_at"] is not None
 
 
@@ -154,13 +160,7 @@ def test_traceability_latest_run_wins(client, auth_headers, project, db_session)
     db_session.refresh(release)
 
     _create_run_result(db_session, release.id, tc.id, "Fail")
-
-    second_run = TestRun(release_id=release.id, executed_by="An")
-    db_session.add(second_run)
-    db_session.commit()
-    db_session.refresh(second_run)
-    db_session.add(TestRunResult(run_id=second_run.id, testcase_id=tc.id, result="Pass"))
-    db_session.commit()
+    _create_run_result(db_session, release.id, tc.id, "Pass")
 
     response = client.get(f"/traceability?project_id={project.id}", headers=auth_headers)
     item = response.json()["items"][0]
