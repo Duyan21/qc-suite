@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from models.all_models import Project, Requirement, TestCase, TestRun, TestRunResult, User
+from models.all_models import Project, Requirement, ReleaseTestCase, ReleaseTestCaseExecution, TestCase, User
 from models.base import get_db
 from schemas.common import RequirementSummary
 from schemas.search import SearchRequest, SearchResponse, SearchResultItem
@@ -62,14 +62,14 @@ def semantic_search(
 
     last_result_by_testcase: dict[int, str] = {}
     if testcase_ids:
-        run_results = (
-            db.query(TestRunResult.testcase_id, TestRunResult.result)
-            .join(TestRun, TestRunResult.run_id == TestRun.id)
-            .filter(TestRunResult.testcase_id.in_(testcase_ids))
-            .order_by(TestRun.executed_at.desc(), TestRunResult.id.desc())
+        execution_rows = (
+            db.query(ReleaseTestCase.testcase_id, ReleaseTestCaseExecution.result)
+            .join(ReleaseTestCaseExecution, ReleaseTestCaseExecution.release_test_case_id == ReleaseTestCase.id)
+            .filter(ReleaseTestCase.testcase_id.in_(testcase_ids))
+            .order_by(ReleaseTestCaseExecution.executed_at.desc(), ReleaseTestCaseExecution.id.desc())
             .all()
         )
-        for testcase_id, result in run_results:
+        for testcase_id, result in execution_rows:
             if testcase_id not in last_result_by_testcase:
                 last_result_by_testcase[testcase_id] = result
 
