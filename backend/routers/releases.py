@@ -1,11 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
-from models.all_models import Project, Release, ReleaseTestCase, Requirement, TestCase, User
+from models.all_models import (
+    ExecutionEvidenceImage,
+    Project,
+    Release,
+    ReleaseTestCase,
+    ReleaseTestCaseExecution,
+    Requirement,
+    TestCase,
+    User,
+)
 from models.base import get_db
 from schemas.common import RequirementSummary
 from schemas.releases import (
     AddTestCasesRequest,
+    EvidenceImageItem,
+    ExecutionHistoryItem,
     ReleaseCreate,
     ReleaseResponse,
     ReleaseStatusUpdate,
@@ -13,6 +26,7 @@ from schemas.releases import (
     ReleaseTestCaseTestCase,
 )
 from services.auth_service import get_current_user
+from services.evidence_storage import save_evidence_image
 from services.permissions import (
     PermissionArea,
     PermissionLevel,
@@ -238,8 +252,6 @@ def remove_release_test_case(
     if rtc is None:
         raise HTTPException(status_code=404, detail="Test case not in this release")
 
-    from models.all_models import ExecutionEvidenceImage, ReleaseTestCaseExecution
-
     execution_ids = [
         e.id for e in db.query(ReleaseTestCaseExecution).filter(ReleaseTestCaseExecution.release_test_case_id == rtc.id).all()
     ]
@@ -251,3 +263,101 @@ def remove_release_test_case(
 
     recompute_release_status(db, release)
     db.commit()
+
+
+@router.post(
+    "/{release_id}/test-cases/{testcase_id}/execute",
+    response_model=ExecutionHistoryItem,
+    status_code=status.HTTP_201_CREATED,
+)
+def execute_release_test_case(
+    release_id: int,
+    testcase_id: int,
+    result: Literal["Pass", "Fail"] = Form(...),
+    note: str | None = Form(None),
+    images: list[UploadFile] = File(default=[]),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    release = db.get(Release, release_id)
+    if release is None:
+        raise HTTPException(status_code=404, detail="Release not found")
+    check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.EDIT)
+
+    rtc = (
+        db.query(ReleaseTestCase)
+        .filter(ReleaseTestCase.release_id == release_id, ReleaseTestCase.testcase_id == testcase_id)
+        .first()
+    )
+    if rtc is None:
+        raise HTTPException(status_code=400, detail="Test case not in this release")
+
+    execution = ReleaseTestCaseExecution(release_test_case_id=rtc.id, result=result, note=note, executed_by=current_user.id)
+    db.add(execution)
+    db.flush()
+
+    for upload in images:
+        save_evidence_image(db, execution.id, release_id, testcase_id, upload)
+
+    rtc.current_result = result
+    db.flush()
+    recompute_release_status(db, release)
+    db.commit()
+    db.refresh(execution)
+
+    image_rows = db.query(ExecutionEvidenceImage).filter(ExecutionEvidenceImage.execution_id == execution.id).all()
+    return ExecutionHistoryItem(
+        id=execution.id,
+        result=execution.result,
+        note=execution.note,
+        executed_by_name=_display_name(current_user),
+        executed_at=execution.executed_at,
+        images=[EvidenceImageItem(id=i.id, url=f"/uploads{i.file_path}") for i in image_rows],
+    )
+
+
+@router.get("/{release_id}/test-cases/{testcase_id}/executions", response_model=list[ExecutionHistoryItem])
+def list_release_test_case_executions(
+    release_id: int,
+    testcase_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    release = db.get(Release, release_id)
+    if release is None:
+        raise HTTPException(status_code=404, detail="Release not found")
+    check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.READ)
+
+    rtc = (
+        db.query(ReleaseTestCase)
+        .filter(ReleaseTestCase.release_id == release_id, ReleaseTestCase.testcase_id == testcase_id)
+        .first()
+    )
+    if rtc is None:
+        raise HTTPException(status_code=404, detail="Test case not in this release")
+
+    executions = (
+        db.query(ReleaseTestCaseExecution)
+        .filter(ReleaseTestCaseExecution.release_test_case_id == rtc.id)
+        .order_by(ReleaseTestCaseExecution.executed_at.desc(), ReleaseTestCaseExecution.id.desc())
+        .all()
+    )
+    user_ids = {e.executed_by for e in executions if e.executed_by is not None}
+    users_by_id = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+    exec_ids = [e.id for e in executions]
+    images_by_exec: dict[int, list] = {}
+    if exec_ids:
+        for img in db.query(ExecutionEvidenceImage).filter(ExecutionEvidenceImage.execution_id.in_(exec_ids)).all():
+            images_by_exec.setdefault(img.execution_id, []).append(img)
+
+    return [
+        ExecutionHistoryItem(
+            id=e.id,
+            result=e.result,
+            note=e.note,
+            executed_by_name=_display_name(users_by_id.get(e.executed_by)),
+            executed_at=e.executed_at,
+            images=[EvidenceImageItem(id=i.id, url=f"/uploads{i.file_path}") for i in images_by_exec.get(e.id, [])],
+        )
+        for e in executions
+    ]
