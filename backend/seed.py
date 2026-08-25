@@ -18,11 +18,11 @@ from models.all_models import (
     Project,
     ProjectMember,
     Release,
+    ReleaseTestCase,
+    ReleaseTestCaseExecution,
     Requirement,
     Role,
     TestCase,
-    TestRun,
-    TestRunResult,
     User,
 )
 from models.base import SessionLocal
@@ -250,11 +250,6 @@ def seed_test_runs(db, releases, test_cases, defect_data):
     sit_release = next(r for r in releases if r.version_name == "v1.0.0-SIT")
     uat_release = next(r for r in releases if r.version_name == "v1.1.0-UAT")
 
-    sit_run = TestRun(release_id=sit_release.id, executed_by="seed-script", note="SIT full regression run.")
-    uat_run = TestRun(release_id=uat_release.id, executed_by="seed-script", note="UAT targeted regression run.")
-    db.add_all([sit_run, uat_run])
-    db.flush()
-
     results = []
 
     for tc_id, tc in test_cases.items():
@@ -263,7 +258,12 @@ def seed_test_runs(db, releases, test_cases, defect_data):
             result = "Fail"
         else:
             result = random.choice(EXECUTION_RESULTS_WEIGHTED)
-        results.append(TestRunResult(run_id=sit_run.id, testcase_id=tc.id, result=result))
+        rtc = ReleaseTestCase(release_id=sit_release.id, testcase_id=tc.id, current_result=result)
+        db.add(rtc)
+        db.flush()
+        results.append(
+            ReleaseTestCaseExecution(release_test_case_id=rtc.id, result=result, note="SIT full regression run.")
+        )
 
     uat_tc_ids = [
         tc_id for tc_id in test_cases
@@ -276,7 +276,12 @@ def seed_test_runs(db, releases, test_cases, defect_data):
             result = "Pass" if defect["status"] in CLOSED_DEFECT_STATUSES else "Fail"
         else:
             result = random.choice(EXECUTION_RESULTS_WEIGHTED)
-        results.append(TestRunResult(run_id=uat_run.id, testcase_id=tc.id, result=result))
+        rtc = ReleaseTestCase(release_id=uat_release.id, testcase_id=tc.id, current_result=result)
+        db.add(rtc)
+        db.flush()
+        results.append(
+            ReleaseTestCaseExecution(release_test_case_id=rtc.id, result=result, note="UAT targeted regression run.")
+        )
 
     db.add_all(results)
     db.flush()
@@ -311,7 +316,7 @@ def main():
             f"Inserted: 1 project, {len(users)} users, {len(releases)} releases, "
             f"{len(requirements)} requirements (current versions), "
             f"{len(test_cases)} test cases, {len(defects)} defects, "
-            f"2 test runs, {len(results)} test run results."
+            f"{len(results)} release test case executions."
         )
     finally:
         db.close()

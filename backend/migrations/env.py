@@ -26,7 +26,7 @@ from pgvector.sqlalchemy import Vector  # noqa
 from models.base import Base
 from models.all_models import (
     User, Project, Release, Requirement,
-    TestCase, Defect, TestRun, TestRunResult
+    TestCase, Defect
 )
 
 target_metadata = Base.metadata
