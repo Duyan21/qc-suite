@@ -45,7 +45,7 @@ VERSIONED_NEW_DESCRIPTION = (
     "statements issued within the last 3 months, per updated compliance policy."
 )
 
-EXECUTION_RESULTS_WEIGHTED = ["Pass"] * 7 + ["Fail"] + ["Skip"] + ["Blocked"]
+EXECUTION_RESULTS_WEIGHTED = ["Pass"] * 7 + ["Fail"] * 3
 OPEN_DEFECT_STATUSES = {"New", "Assigned", "In Progress", "Ready for Retest"}
 CLOSED_DEFECT_STATUSES = {"Fixed", "Closed"}
 
@@ -240,7 +240,7 @@ def seed_defects(db, project, test_cases, requirements, defect_data, releases):
     return defects
 
 
-def seed_test_runs(db, releases, test_cases, defect_data):
+def seed_release_test_cases(db, releases, test_cases, defect_data):
     """SIT run covers full regression; UAT run covers a targeted subset.
     Results for defect-linked test cases are consistent with defect status
     instead of random, so traceability data tells a coherent story.
@@ -308,7 +308,7 @@ def main():
         requirements = seed_requirements(db, project, req_data, modules)
         test_cases = seed_test_cases(db, requirements, tc_data)
         defects = seed_defects(db, project, test_cases, requirements, defect_data, releases)
-        results = seed_test_runs(db, releases, test_cases, defect_data)
+        results = seed_release_test_cases(db, releases, test_cases, defect_data)
 
         db.commit()
 
