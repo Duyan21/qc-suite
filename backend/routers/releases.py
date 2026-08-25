@@ -1,9 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from models.all_models import Project, Release, ReleaseTestCase, User
+from models.all_models import Project, Release, ReleaseTestCase, Requirement, TestCase, User
 from models.base import get_db
-from schemas.releases import ReleaseCreate, ReleaseResponse, ReleaseStatusUpdate
+from schemas.common import RequirementSummary
+from schemas.releases import (
+    AddTestCasesRequest,
+    ReleaseCreate,
+    ReleaseResponse,
+    ReleaseStatusUpdate,
+    ReleaseTestCaseItem,
+    ReleaseTestCaseTestCase,
+)
 from services.auth_service import get_current_user
 from services.permissions import (
     PermissionArea,
@@ -117,3 +125,129 @@ def update_release_status(
     db.commit()
     db.refresh(release)
     return _release_response(db, release)
+
+
+def _rtc_item(rtc: ReleaseTestCase, tc: TestCase, requirement: Requirement | None, added_by_user: User | None) -> ReleaseTestCaseItem:
+    return ReleaseTestCaseItem(
+        id=rtc.id,
+        testcase=ReleaseTestCaseTestCase(
+            id=tc.id, code=tc.code, title=tc.title, priority=tc.priority, status=tc.status,
+            requirement=RequirementSummary.model_validate(requirement) if requirement else None,
+        ),
+        current_result=rtc.current_result,
+        added_by_name=_display_name(added_by_user),
+        added_at=rtc.added_at,
+    )
+
+
+def _release_test_case_rows_response(db: Session, release_id: int, testcase_ids: set[int]) -> list[ReleaseTestCaseItem]:
+    rows = (
+        db.query(ReleaseTestCase, TestCase)
+        .join(TestCase, ReleaseTestCase.testcase_id == TestCase.id)
+        .filter(ReleaseTestCase.release_id == release_id, ReleaseTestCase.testcase_id.in_(testcase_ids))
+        .all()
+        if testcase_ids
+        else []
+    )
+    requirement_ids = {tc.requirement_id for _, tc in rows if tc.requirement_id is not None}
+    requirements_by_id = (
+        {r.id: r for r in db.query(Requirement).filter(Requirement.id.in_(requirement_ids)).all()}
+        if requirement_ids
+        else {}
+    )
+    user_ids = {rtc.added_by for rtc, _ in rows if rtc.added_by is not None}
+    users_by_id = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+    return [
+        _rtc_item(rtc, tc, requirements_by_id.get(tc.requirement_id), users_by_id.get(rtc.added_by))
+        for rtc, tc in rows
+    ]
+
+
+@router.get("/{release_id}/test-cases", response_model=list[ReleaseTestCaseItem])
+def list_release_test_cases(release_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    release = db.get(Release, release_id)
+    if release is None:
+        raise HTTPException(status_code=404, detail="Release not found")
+    check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.READ)
+
+    all_ids = {
+        tc_id for (tc_id,) in db.query(ReleaseTestCase.testcase_id).filter(ReleaseTestCase.release_id == release_id).all()
+    }
+    return _release_test_case_rows_response(db, release_id, all_ids)
+
+
+@router.post("/{release_id}/test-cases", response_model=list[ReleaseTestCaseItem], status_code=status.HTTP_201_CREATED)
+def add_release_test_cases(
+    release_id: int,
+    payload: AddTestCasesRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    release = db.get(Release, release_id)
+    if release is None:
+        raise HTTPException(status_code=404, detail="Release not found")
+    check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.EDIT)
+
+    testcase_ids = set(payload.testcase_ids or [])
+    if payload.requirement_ids:
+        linked = (
+            db.query(TestCase.id)
+            .filter(TestCase.requirement_id.in_(payload.requirement_ids), TestCase.status != "Deprecated")
+            .all()
+        )
+        testcase_ids.update(tc_id for (tc_id,) in linked)
+
+    if not testcase_ids:
+        raise HTTPException(status_code=400, detail="No test cases resolved to add")
+
+    existing_ids = {
+        tc_id
+        for (tc_id,) in db.query(ReleaseTestCase.testcase_id)
+        .filter(ReleaseTestCase.release_id == release_id, ReleaseTestCase.testcase_id.in_(testcase_ids))
+        .all()
+    }
+    new_ids = testcase_ids - existing_ids
+
+    for tc_id in new_ids:
+        db.add(ReleaseTestCase(release_id=release_id, testcase_id=tc_id, added_by=current_user.id))
+    db.flush()
+
+    recompute_release_status(db, release)
+    db.commit()
+
+    return _release_test_case_rows_response(db, release_id, new_ids)
+
+
+@router.delete("/{release_id}/test-cases/{testcase_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_release_test_case(
+    release_id: int,
+    testcase_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    release = db.get(Release, release_id)
+    if release is None:
+        raise HTTPException(status_code=404, detail="Release not found")
+    check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.EDIT)
+
+    rtc = (
+        db.query(ReleaseTestCase)
+        .filter(ReleaseTestCase.release_id == release_id, ReleaseTestCase.testcase_id == testcase_id)
+        .first()
+    )
+    if rtc is None:
+        raise HTTPException(status_code=404, detail="Test case not in this release")
+
+    from models.all_models import ExecutionEvidenceImage, ReleaseTestCaseExecution
+
+    execution_ids = [
+        e.id for e in db.query(ReleaseTestCaseExecution).filter(ReleaseTestCaseExecution.release_test_case_id == rtc.id).all()
+    ]
+    if execution_ids:
+        db.query(ExecutionEvidenceImage).filter(ExecutionEvidenceImage.execution_id.in_(execution_ids)).delete(synchronize_session=False)
+        db.query(ReleaseTestCaseExecution).filter(ReleaseTestCaseExecution.id.in_(execution_ids)).delete(synchronize_session=False)
+    db.delete(rtc)
+    db.flush()
+
+    recompute_release_status(db, release)
+    db.commit()
