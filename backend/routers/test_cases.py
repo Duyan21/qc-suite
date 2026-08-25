@@ -3,12 +3,10 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from models.all_models import Project, Release, Requirement, TestCase, TestRun, TestRunResult, User
+from models.all_models import Project, Release, ReleaseTestCase, ReleaseTestCaseExecution, Requirement, TestCase, User
 from models.base import get_db
 from schemas.common import RequirementSummary
 from schemas.test_cases import (
-    ExecuteTestCaseRequest,
-    ExecutionResultResponse,
     TestCaseCreate,
     TestCaseDetailResponse,
     TestCaseExecutionHistoryItem,
@@ -226,49 +224,6 @@ def delete_test_case(id: int, db: Session = Depends(get_db), current_user: User 
     return tc
 
 
-@router.post("/{id}/execute", response_model=ExecutionResultResponse)
-def execute_test_case(
-    id: int,
-    payload: ExecuteTestCaseRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    tc = db.get(TestCase, id)
-    if tc is None:
-        raise HTTPException(status_code=404, detail="TestCase not found")
-    run = db.get(TestRun, payload.run_id)
-    if run is None:
-        raise HTTPException(status_code=400, detail="run_id not found")
-    release = db.get(Release, run.release_id)
-    check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.EDIT)
-
-    existing = (
-        db.query(TestRunResult)
-        .filter(
-            TestRunResult.run_id == payload.run_id,
-            TestRunResult.testcase_id == id,
-        )
-        .first()
-    )
-    if existing is not None:
-        existing.result = payload.result
-        existing.note = payload.note
-        db.commit()
-        db.refresh(existing)
-        return existing
-
-    result_row = TestRunResult(
-        run_id=payload.run_id,
-        testcase_id=id,
-        result=payload.result,
-        note=payload.note,
-    )
-    db.add(result_row)
-    db.commit()
-    db.refresh(result_row)
-    return result_row
-
-
 @router.get("/{id}/results", response_model=list[TestCaseExecutionHistoryItem])
 def get_test_case_results(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     tc = db.get(TestCase, id)
@@ -283,21 +238,19 @@ def get_test_case_results(id: int, db: Session = Depends(get_db), current_user: 
         )
 
     rows = (
-        db.query(TestRunResult, TestRun)
-        .join(TestRun, TestRunResult.run_id == TestRun.id)
-        .filter(TestRunResult.testcase_id == id)
-        .order_by(TestRun.executed_at.desc())
+        db.query(ReleaseTestCaseExecution, Release)
+        .join(ReleaseTestCase, ReleaseTestCaseExecution.release_test_case_id == ReleaseTestCase.id)
+        .join(Release, ReleaseTestCase.release_id == Release.id)
+        .filter(ReleaseTestCase.testcase_id == id)
+        .order_by(ReleaseTestCaseExecution.executed_at.desc(), ReleaseTestCaseExecution.id.desc())
         .all()
     )
-    history = []
-    for result_row, run in rows:
-        release = db.get(Release, run.release_id)
-        history.append(
-            TestCaseExecutionHistoryItem(
-                release_version=release.version_name,
-                result=result_row.result,
-                executed_at=run.executed_at,
-                note=result_row.note,
-            )
+    return [
+        TestCaseExecutionHistoryItem(
+            release_version=release.version_name,
+            result=execution.result,
+            executed_at=execution.executed_at,
+            note=execution.note,
         )
-    return history
+        for execution, release in rows
+    ]
