@@ -16,7 +16,7 @@ export async function listUsers(): Promise<SystemUser[]> {
 
 export async function updateUserAccess(
   userId: number,
-  payload: { is_superadmin?: boolean; can_create_projects?: boolean },
+  payload: { is_superadmin?: boolean; can_create_projects?: boolean; is_active?: boolean },
 ): Promise<SystemUser> {
   return authFetch<SystemUser>(`/users/${userId}`, { method: 'PATCH', body: payload })
 }

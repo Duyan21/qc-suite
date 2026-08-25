@@ -43,10 +43,21 @@ def update_user(
         if other_superadmins == 0:
             raise HTTPException(status_code=400, detail="Cannot remove the last superadmin")
 
+    if payload.is_active is False and user.is_superadmin and user.is_active:
+        other_active_superadmins = (
+            db.query(User)
+            .filter(User.is_superadmin.is_(True), User.is_active.is_(True), User.id != user.id)
+            .count()
+        )
+        if other_active_superadmins == 0:
+            raise HTTPException(status_code=400, detail="Cannot retire the last active superadmin")
+
     if payload.is_superadmin is not None:
         user.is_superadmin = payload.is_superadmin
     if payload.can_create_projects is not None:
         user.can_create_projects = payload.can_create_projects
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
 
     db.commit()
     db.refresh(user)

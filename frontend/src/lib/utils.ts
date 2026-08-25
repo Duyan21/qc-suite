@@ -11,3 +11,12 @@ export function formatDate(iso: string): string {
   if (Number.isNaN(d.getTime())) return '—'
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
 }
+
+export function getInitials(name: string | null, email: string): string {
+  const source = (name ?? '').trim()
+  if (!source) return email[0]?.toUpperCase() ?? '?'
+  const parts = source.split(/\s+/)
+  const first = parts[0]?.[0] ?? ''
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : ''
+  return (first + last).toUpperCase()
+}
