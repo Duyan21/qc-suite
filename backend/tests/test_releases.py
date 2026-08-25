@@ -43,16 +43,29 @@ def test_create_release_requires_edit(client, db_session, member_user, role_by_k
 
 
 def test_list_releases_includes_counts(client, auth_headers, db_session):
+    from models.all_models import Requirement, TestCase
+    from services.code_generator import next_code
+
     project = _create_project(db_session, key="RLC")
     release = Release(project_id=project.id, version_name="v1")
     db_session.add(release)
     db_session.commit()
     db_session.refresh(release)
-    db_session.add_all([
-        ReleaseTestCase(release_id=release.id, testcase_id=1, current_result="Pass"),
-    ])
-    # testcase_id=1 need not exist for this count-only assertion since the
-    # list endpoint counts release_test_cases rows directly, not a join.
+
+    req = Requirement(
+        project_id=project.id, req_id=next_code(db_session, Requirement, "req_id", "REQ"),
+        version=1, title="t", description="d", status="Active", is_current=True,
+    )
+    db_session.add(req)
+    db_session.commit()
+    db_session.refresh(req)
+
+    tc = TestCase(code=next_code(db_session, TestCase, "code", "TC"), title="t", expected_result="e", requirement_id=req.id)
+    db_session.add(tc)
+    db_session.commit()
+    db_session.refresh(tc)
+
+    db_session.add(ReleaseTestCase(release_id=release.id, testcase_id=tc.id, current_result="Pass"))
     db_session.commit()
 
     response = client.get(f"/releases?project_id={project.id}", headers=auth_headers)
