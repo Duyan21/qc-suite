@@ -188,26 +188,6 @@ class ExecutionEvidenceImage(Base):
     uploaded_at = Column(TIMESTAMP, server_default=func.now())
 
 
-class TestRun(Base):
-    __tablename__ = "test_runs"
-
-    id = Column(Integer, primary_key=True)
-    release_id = Column(Integer, ForeignKey("releases.id"), nullable=False)
-    executed_at = Column(TIMESTAMP, server_default=func.now())
-    executed_by = Column(String(100), nullable=True)
-    note = Column(Text, nullable=True)
-
-
-class TestRunResult(Base):
-    __tablename__ = "test_run_results"
-
-    id = Column(Integer, primary_key=True)
-    run_id = Column(Integer, ForeignKey("test_runs.id"), nullable=False)
-    testcase_id = Column(Integer, ForeignKey("test_cases.id"), nullable=False)
-    result = Column(String(20), nullable=True)
-    note = Column(Text, nullable=True)
-
-
 class AgentCache(Base):
     __tablename__ = "agent_cache"
 
