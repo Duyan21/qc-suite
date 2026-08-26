@@ -48,15 +48,25 @@ export function AddTestCasesDialog({ open, onOpenChange, releaseId, projectId, o
     if (!open) return
     const requestId = ++requestIdRef.current
     if (tab === 'requirement') {
-      listRequirements(projectId, { search: debouncedSearch || undefined, limit: 30 }).then((result) => {
-        if (requestIdRef.current !== requestId) return
-        setRequirementResults(result.items)
-      })
+      listRequirements(projectId, { search: debouncedSearch || undefined, limit: 30 })
+        .then((result) => {
+          if (requestIdRef.current !== requestId) return
+          setRequirementResults(result.items)
+        })
+        .catch(() => {
+          if (requestIdRef.current !== requestId) return
+          setRequirementResults([])
+        })
     } else {
-      listTestCases({ project_id: projectId, search: debouncedSearch || undefined, limit: 30 }).then((result) => {
-        if (requestIdRef.current !== requestId) return
-        setTestCaseResults(result.items.map((tc) => ({ id: tc.id, code: tc.code, title: tc.title, status: tc.status })))
-      })
+      listTestCases({ project_id: projectId, search: debouncedSearch || undefined, limit: 30 })
+        .then((result) => {
+          if (requestIdRef.current !== requestId) return
+          setTestCaseResults(result.items.map((tc) => ({ id: tc.id, code: tc.code, title: tc.title, status: tc.status })))
+        })
+        .catch(() => {
+          if (requestIdRef.current !== requestId) return
+          setTestCaseResults([])
+        })
     }
   }, [open, tab, projectId, debouncedSearch])
 
@@ -170,7 +180,14 @@ export function AddTestCasesDialog({ open, onOpenChange, releaseId, projectId, o
 
         {error && <p className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              reset()
+              onOpenChange(false)
+            }}
+          >
             Hủy
           </Button>
           <Button type="button" disabled={submitting || selectedCount === 0} onClick={handleSubmit}>
