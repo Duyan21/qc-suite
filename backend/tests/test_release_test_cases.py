@@ -95,6 +95,36 @@ def test_add_test_cases_requires_edit(client, db_session, member_user):
     assert response.status_code == 403
 
 
+def test_add_test_cases_rejects_testcase_from_another_project(client, auth_headers, db_session):
+    _, release_a, _, _, _ = _setup(db_session, key="RTCX1")
+    _, _, _, tc_b, _ = _setup(db_session, key="RTCX2")
+
+    response = client.post(
+        f"/releases/{release_a.id}/test-cases",
+        json={"testcase_ids": [tc_b.id]},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+    listed = client.get(f"/releases/{release_a.id}/test-cases", headers=auth_headers)
+    assert listed.json() == []
+
+
+def test_add_test_cases_rejects_requirement_from_another_project(client, auth_headers, db_session):
+    _, release_a, _, _, _ = _setup(db_session, key="RTCX3")
+    _, _, req_b, _, _ = _setup(db_session, key="RTCX4")
+
+    response = client.post(
+        f"/releases/{release_a.id}/test-cases",
+        json={"requirement_ids": [req_b.id]},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+    listed = client.get(f"/releases/{release_a.id}/test-cases", headers=auth_headers)
+    assert listed.json() == []
+
+
 def test_list_release_test_cases_includes_requirement_summary(client, auth_headers, db_session):
     project, release, req, tc1, tc2 = _setup(db_session, key="RTC6")
     client.post(f"/releases/{release.id}/test-cases", json={"testcase_ids": [tc1.id]}, headers=auth_headers)

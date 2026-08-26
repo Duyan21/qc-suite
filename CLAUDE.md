@@ -48,21 +48,22 @@ Invalidated when requirement gets a new version.
   the extension is enabled first — the migration doesn't do this itself:
   `docker exec -it qcsuite_db psql -U qcsuite -d qcsuite_db -c "CREATE EXTENSION IF NOT EXISTS vector;"`
 
-### Tables (8 total)
+### Tables (9 total)
 | Table | Purpose |
 |-------|---------|
 | users | Auth only |
 | projects | Admin grouping |
-| releases | Release versions for Release Report |
+| releases | Release versions for Release Report; also carries `status` (New/InProgress/Completed, derived from member results), `target_date`, `owner_user_id` |
 | requirements | Versioned (req_id, version, is_current, previous_version_id) |
 | test_cases | Has embedding VECTOR(768), FK → requirements.id |
 | defects | FK to test_cases and requirements (both optional) |
-| test_runs | Execution sessions per release |
-| test_run_results | Pass/Fail/Skip/Blocked per TC per run |
+| release_test_cases | Membership: "this test case is part of this release", with cached `current_result` (NotRun/Pass/Fail) mirroring the latest execution |
+| release_test_case_executions | One row per execution *attempt* (result Pass/Fail, note, executed_by, executed_at) — history is kept, never overwritten |
+| execution_evidence_images | Screenshot evidence per execution; `file_path` is relative to the uploads dir |
 
 ### Key Constraints
 - requirements: UNIQUE (req_id, version)
-- test_run_results: UNIQUE (run_id, testcase_id)
+- release_test_cases: UNIQUE (release_id, testcase_id)
 
 ## Alembic
 Database migration tool — tracks schema changes as versioned files.
@@ -115,17 +116,20 @@ qc-suite/
 `/login`, `/register`, `/forgot-password` (standalone, no sidebar) + 10 routes under
 `AppLayout`: `/dashboard`, `/requirements`, `/testcases`, `/defects`, `/traceability`,
 `/search`, `/agent`, `/report`, `/testruns`, `/admin` (see `frontend/src/nav.tsx` for the
-authoritative list/order). Bare `/` redirects to `/dashboard`. `/requirements/:id` is a
-second, non-nav route wired directly in `App.tsx` (not `nav.tsx`) — a detail-page target
-linked from elsewhere (currently the Traceability matrix's `req_id` cells), not a sidebar
-item.
+authoritative list/order). Bare `/` redirects to `/dashboard`. `/requirements/:id` and
+`/testruns/:id` are non-nav routes wired directly in `App.tsx` (not `nav.tsx`) —
+detail-page targets linked from elsewhere (the Traceability matrix's `req_id` cells; the
+Test Runs list's release rows), not sidebar items.
 
-Wired-to-real-backend: Auth (Sprint 0/1) and Traceability (Sprint 1 — `GET /traceability`,
-plus the new project switcher, see below). Built with real UI but still mock data, not yet
-backend-integrated: Admin. Bare placeholder pages (Card + title only): Dashboard,
-Requirements, Test Cases, Defects, Semantic Search, Impact Agent, Test Runs, Release
-Report, and the `/requirements/:id` detail stub (deliberately bare — real content lands
-whenever `RequirementsPage` itself gets built for real, not before).
+Wired-to-real-backend: Auth (Sprint 0/1), Traceability (Sprint 1 — `GET /traceability`,
+plus the project switcher, see below), and Test Runs (`/testruns` list + `/testruns/:id`
+release detail — release CRUD, add/remove test cases, record executions with screenshot
+evidence, execution history; see `frontend/src/lib/releases.ts` and `backend/routers/
+releases.py`). Built with real UI but still mock data, not yet backend-integrated: Admin.
+Bare placeholder pages (Card + title only): Dashboard, Requirements, Test Cases, Defects,
+Semantic Search, Impact Agent, Release Report, and the `/requirements/:id` detail stub
+(deliberately bare — real content lands whenever `RequirementsPage` itself gets built for
+real, not before).
 
 ### API Integration Pattern (established by the auth wiring)
 `frontend/src/lib/api.ts` is the shared fetch wrapper every backend integration should go

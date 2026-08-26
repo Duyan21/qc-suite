@@ -70,6 +70,44 @@ def test_execute_with_image_persists_evidence(client, auth_headers, db_session):
     assert images[0]["url"].startswith(f"/uploads/evidence/{release.id}/{tc.id}/")
 
 
+def test_execute_with_invalid_image_in_batch_writes_nothing(client, auth_headers, db_session):
+    """A later invalid upload must not leave earlier valid ones orphaned on disk."""
+    import os
+
+    from services.evidence_storage import EVIDENCE_SUBDIR, UPLOADS_DIR
+
+    project, release, tc = _setup_with_tc_in_release(db_session, "EX6")
+    client.post(f"/releases/{release.id}/test-cases", json={"testcase_ids": [tc.id]}, headers=auth_headers)
+
+    directory = os.path.join(UPLOADS_DIR, EVIDENCE_SUBDIR, str(release.id), str(tc.id))
+
+    response = client.post(
+        f"/releases/{release.id}/test-cases/{tc.id}/execute",
+        data={"result": "Pass"},
+        files=[
+            ("images", ("ok.png", io.BytesIO(b"fake-bytes"), "image/png")),
+            ("images", ("bad.pdf", io.BytesIO(b"not-an-image"), "application/pdf")),
+        ],
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+    # The valid first image must not have been written before the batch failed.
+    assert not os.path.isdir(directory) or os.listdir(directory) == []
+
+
+def test_execute_rejects_too_many_images(client, auth_headers, db_session):
+    project, release, tc = _setup_with_tc_in_release(db_session, "EX7")
+    client.post(f"/releases/{release.id}/test-cases", json={"testcase_ids": [tc.id]}, headers=auth_headers)
+
+    response = client.post(
+        f"/releases/{release.id}/test-cases/{tc.id}/execute",
+        data={"result": "Pass"},
+        files=[("images", (f"p{i}.png", io.BytesIO(b"fake-bytes"), "image/png")) for i in range(11)],
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
 def test_execute_twice_keeps_history_and_updates_current_result(client, auth_headers, db_session):
     project, release, tc = _setup_with_tc_in_release(db_session, "EX4")
     client.post(f"/releases/{release.id}/test-cases", json={"testcase_ids": [tc.id]}, headers=auth_headers)

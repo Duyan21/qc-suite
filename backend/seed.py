@@ -11,6 +11,7 @@ Run from backend/ with the venv active and the DB up:
 import json
 import os
 import random
+from datetime import date, timedelta
 
 from models.all_models import (
     Defect,
@@ -27,6 +28,7 @@ from models.all_models import (
 )
 from models.base import SessionLocal
 from services.auth_service import hash_password
+from services.release_status import recompute_release_status
 
 PROJECT_NAME = "Home Lending System"
 
@@ -113,11 +115,30 @@ def seed_users(db, project):
     return [admin_user, tester_user]
 
 
-def seed_releases(db, project):
+def seed_releases(db, project, admin_user):
+    today = date.today()
     releases = [
-        Release(project_id=project.id, version_name="v1.0.0-SIT", note="SIT build, first full regression pass."),
-        Release(project_id=project.id, version_name="v1.1.0-UAT", note="UAT candidate, includes AML and income-policy fixes."),
-        Release(project_id=project.id, version_name="v1.2.0-GA", note="General availability release."),
+        Release(
+            project_id=project.id,
+            version_name="v1.0.0-SIT",
+            note="SIT build, first full regression pass.",
+            target_date=today + timedelta(days=14),
+            owner_user_id=admin_user.id,
+        ),
+        Release(
+            project_id=project.id,
+            version_name="v1.1.0-UAT",
+            note="UAT candidate, includes AML and income-policy fixes.",
+            target_date=today + timedelta(days=30),
+            owner_user_id=admin_user.id,
+        ),
+        Release(
+            project_id=project.id,
+            version_name="v1.2.0-GA",
+            note="General availability release.",
+            target_date=today + timedelta(days=60),
+            owner_user_id=admin_user.id,
+        ),
     ]
     db.add_all(releases)
     db.flush()
@@ -240,7 +261,7 @@ def seed_defects(db, project, test_cases, requirements, defect_data, releases):
     return defects
 
 
-def seed_release_test_cases(db, releases, test_cases, defect_data):
+def seed_release_test_cases(db, releases, test_cases, defect_data, executed_by):
     """SIT run covers full regression; UAT run covers a targeted subset.
     Results for defect-linked test cases are consistent with defect status
     instead of random, so traceability data tells a coherent story.
@@ -262,7 +283,12 @@ def seed_release_test_cases(db, releases, test_cases, defect_data):
         db.add(rtc)
         db.flush()
         results.append(
-            ReleaseTestCaseExecution(release_test_case_id=rtc.id, result=result, note="SIT full regression run.")
+            ReleaseTestCaseExecution(
+                release_test_case_id=rtc.id,
+                result=result,
+                note="SIT full regression run.",
+                executed_by=executed_by,
+            )
         )
 
     uat_tc_ids = [
@@ -280,7 +306,12 @@ def seed_release_test_cases(db, releases, test_cases, defect_data):
         db.add(rtc)
         db.flush()
         results.append(
-            ReleaseTestCaseExecution(release_test_case_id=rtc.id, result=result, note="UAT targeted regression run.")
+            ReleaseTestCaseExecution(
+                release_test_case_id=rtc.id,
+                result=result,
+                note="UAT targeted regression run.",
+                executed_by=executed_by,
+            )
         )
 
     db.add_all(results)
@@ -303,12 +334,20 @@ def main():
 
         project = seed_project(db)
         users = seed_users(db, project)
-        releases = seed_releases(db, project)
+        admin_user = users[0]
+        releases = seed_releases(db, project, admin_user)
         modules = seed_modules(db, project, req_data)
         requirements = seed_requirements(db, project, req_data, modules)
         test_cases = seed_test_cases(db, requirements, tc_data)
         defects = seed_defects(db, project, test_cases, requirements, defect_data, releases)
-        results = seed_release_test_cases(db, releases, test_cases, defect_data)
+        results = seed_release_test_cases(db, releases, test_cases, defect_data, admin_user.id)
+
+        # seed_release_test_cases has already flushed its ReleaseTestCase rows,
+        # so the derivation sees the seeded pass/fail results and each release
+        # lands on a real status instead of the "New" default.
+        for release in releases:
+            recompute_release_status(db, release)
+        db.flush()
 
         db.commit()
 

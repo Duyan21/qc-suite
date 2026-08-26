@@ -26,7 +26,7 @@ from schemas.releases import (
     ReleaseTestCaseTestCase,
 )
 from services.auth_service import get_current_user
-from services.evidence_storage import save_evidence_image
+from services.evidence_storage import validate_evidence_image, write_evidence_image
 from services.permissions import (
     PermissionArea,
     PermissionLevel,
@@ -34,6 +34,8 @@ from services.permissions import (
     is_project_member,
 )
 from services.release_status import recompute_release_status
+
+MAX_IMAGES_PER_EXECUTION = 10
 
 router = APIRouter(
     prefix="/releases",
@@ -202,11 +204,34 @@ def add_release_test_cases(
         raise HTTPException(status_code=404, detail="Release not found")
     check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.EDIT)
 
-    testcase_ids = set(payload.testcase_ids or [])
+    # Both resolution paths are scoped to the release's own project (via
+    # TestCase -> Requirement.project_id). Without this, any user with `edit`
+    # on ANY project could add another project's test cases to their release
+    # and read them back through GET /releases/{id}/test-cases, bypassing the
+    # project-scoped read gates in routers/test_cases.py and requirements.py.
+    # Out-of-project (and nonexistent) ids are silently dropped rather than
+    # 404'd, so the response never confirms that an id exists elsewhere.
+    testcase_ids: set[int] = set()
+    if payload.testcase_ids:
+        scoped = (
+            db.query(TestCase.id)
+            .join(Requirement, TestCase.requirement_id == Requirement.id)
+            .filter(
+                TestCase.id.in_(payload.testcase_ids),
+                Requirement.project_id == release.project_id,
+            )
+            .all()
+        )
+        testcase_ids.update(tc_id for (tc_id,) in scoped)
     if payload.requirement_ids:
         linked = (
             db.query(TestCase.id)
-            .filter(TestCase.requirement_id.in_(payload.requirement_ids), TestCase.status != "Deprecated")
+            .join(Requirement, TestCase.requirement_id == Requirement.id)
+            .filter(
+                TestCase.requirement_id.in_(payload.requirement_ids),
+                TestCase.status != "Deprecated",
+                Requirement.project_id == release.project_id,
+            )
             .all()
         )
         testcase_ids.update(tc_id for (tc_id,) in linked)
@@ -284,6 +309,9 @@ def execute_release_test_case(
         raise HTTPException(status_code=404, detail="Release not found")
     check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.EDIT)
 
+    if len(images) > MAX_IMAGES_PER_EXECUTION:
+        raise HTTPException(status_code=400, detail=f"Too many images (max {MAX_IMAGES_PER_EXECUTION})")
+
     rtc = (
         db.query(ReleaseTestCase)
         .filter(ReleaseTestCase.release_id == release_id, ReleaseTestCase.testcase_id == testcase_id)
@@ -292,12 +320,17 @@ def execute_release_test_case(
     if rtc is None:
         raise HTTPException(status_code=400, detail="Test case not in this release")
 
+    # Validate the whole batch before writing any of it: a mid-batch 400 used
+    # to leave the already-written files orphaned on disk with no DB row,
+    # since the request was rolled back afterwards.
+    validated = [validate_evidence_image(upload) for upload in images]
+
     execution = ReleaseTestCaseExecution(release_test_case_id=rtc.id, result=result, note=note, executed_by=current_user.id)
     db.add(execution)
     db.flush()
 
-    for upload in images:
-        save_evidence_image(db, execution.id, release_id, testcase_id, upload)
+    for data, ext in validated:
+        write_evidence_image(db, execution.id, release_id, testcase_id, data, ext)
 
     rtc.current_result = result
     db.flush()
