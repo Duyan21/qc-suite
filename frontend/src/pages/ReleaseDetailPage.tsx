@@ -38,7 +38,9 @@ export function ReleaseDetailPage() {
   const [removeTarget, setRemoveTarget] = useState<{ id: number; code: string } | null>(null)
   const [historyTarget, setHistoryTarget] = useState<{ id: number; code: string } | null>(null)
   const [history, setHistory] = useState<ExecutionHistoryItem[] | null>(null)
+  const [historyError, setHistoryError] = useState<string | null>(null)
   const requestIdRef = useRef(0)
+  const historyRequestIdRef = useRef(0)
 
   function load() {
     const requestId = ++requestIdRef.current
@@ -67,11 +69,19 @@ export function ReleaseDetailPage() {
   }, [releaseId])
 
   useEffect(() => {
-    if (!historyTarget) {
-      setHistory(null)
-      return
-    }
-    getExecutionHistory(releaseId, historyTarget.id).then(setHistory)
+    setHistory(null)
+    setHistoryError(null)
+    if (!historyTarget) return
+    const requestId = ++historyRequestIdRef.current
+    getExecutionHistory(releaseId, historyTarget.id)
+      .then((result) => {
+        if (historyRequestIdRef.current !== requestId) return
+        setHistory(result)
+      })
+      .catch((err) => {
+        if (historyRequestIdRef.current !== requestId) return
+        setHistoryError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra')
+      })
   }, [historyTarget, releaseId])
 
   async function handleMarkCompleted() {
@@ -218,7 +228,8 @@ export function ReleaseDetailPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {history === null && <p className="text-sm text-muted-foreground">Đang tải...</p>}
+            {history === null && !historyError && <p className="text-sm text-muted-foreground">Đang tải...</p>}
+            {historyError && <p className="text-sm text-destructive">{historyError}</p>}
             {history !== null && history.length === 0 && (
               <p className="text-sm text-muted-foreground">Chưa có lần thực thi nào.</p>
             )}
