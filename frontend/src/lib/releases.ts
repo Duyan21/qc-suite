@@ -64,8 +64,28 @@ export const CURRENT_RESULT_BADGE_CLASS: Record<string, string> = {
   Fail: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
 }
 
+// Backend errors are English wire strings; only this layer knows which of them
+// are user-facing, so it maps them to the UI's Vietnamese copy (same pattern as
+// lib/auth.ts). The permission-check 403s are `Requires {level} on {area}` and
+// this module only ever hits the test_runs area.
+const ERROR_MESSAGES: Record<string, string> = {
+  'No test cases resolved to add': 'Không có test case nào được thêm — kiểm tra lại lựa chọn của bạn.',
+  'Requires read on test_runs': 'Bạn không có quyền xem Test Runs trong dự án này.',
+  'Requires edit on test_runs': 'Bạn không có quyền chỉnh sửa Test Runs trong dự án này.',
+  'Requires full on test_runs': 'Bạn không có quyền thực hiện thao tác này trong Test Runs.',
+}
+
+function toVietnameseError(err: unknown): Error {
+  const message = err instanceof Error ? err.message : ''
+  return new Error(ERROR_MESSAGES[message] ?? 'Đã có lỗi xảy ra, vui lòng thử lại.')
+}
+
 export async function listReleases(projectId: number): Promise<Release[]> {
-  return authFetch<Release[]>(`/releases?project_id=${projectId}`)
+  try {
+    return await authFetch<Release[]>(`/releases?project_id=${projectId}`)
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }
 
 export async function createRelease(payload: {
@@ -75,33 +95,57 @@ export async function createRelease(payload: {
   target_date?: string
   owner_user_id?: number
 }): Promise<Release> {
-  return authFetch<Release>('/releases', { method: 'POST', body: payload })
+  try {
+    return await authFetch<Release>('/releases', { method: 'POST', body: payload })
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }
 
 export async function getRelease(id: number): Promise<Release> {
-  return authFetch<Release>(`/releases/${id}`)
+  try {
+    return await authFetch<Release>(`/releases/${id}`)
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }
 
 export async function updateReleaseStatus(id: number, status: ReleaseStatus): Promise<Release> {
-  return authFetch<Release>(`/releases/${id}/status`, { method: 'PATCH', body: { status } })
+  try {
+    return await authFetch<Release>(`/releases/${id}/status`, { method: 'PATCH', body: { status } })
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }
 
 export async function listReleaseTestCases(releaseId: number): Promise<ReleaseTestCaseItem[]> {
-  return authFetch<ReleaseTestCaseItem[]>(`/releases/${releaseId}/test-cases`)
+  try {
+    return await authFetch<ReleaseTestCaseItem[]>(`/releases/${releaseId}/test-cases`)
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }
 
 export async function addTestCasesToRelease(
   releaseId: number,
   payload: { testcase_ids?: number[]; requirement_ids?: number[] },
 ): Promise<ReleaseTestCaseItem[]> {
-  return authFetch<ReleaseTestCaseItem[]>(`/releases/${releaseId}/test-cases`, {
-    method: 'POST',
-    body: payload,
-  })
+  try {
+    return await authFetch<ReleaseTestCaseItem[]>(`/releases/${releaseId}/test-cases`, {
+      method: 'POST',
+      body: payload,
+    })
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }
 
 export async function removeTestCaseFromRelease(releaseId: number, testcaseId: number): Promise<void> {
-  return authFetch<void>(`/releases/${releaseId}/test-cases/${testcaseId}`, { method: 'DELETE' })
+  try {
+    return await authFetch<void>(`/releases/${releaseId}/test-cases/${testcaseId}`, { method: 'DELETE' })
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }
 
 export async function executeTestCase(
@@ -115,12 +159,20 @@ export async function executeTestCase(
   for (const image of payload.images) {
     formData.append('images', image)
   }
-  return authFetchMultipart<ExecutionHistoryItem>(
-    `/releases/${releaseId}/test-cases/${testcaseId}/execute`,
-    formData,
-  )
+  try {
+    return await authFetchMultipart<ExecutionHistoryItem>(
+      `/releases/${releaseId}/test-cases/${testcaseId}/execute`,
+      formData,
+    )
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }
 
 export async function getExecutionHistory(releaseId: number, testcaseId: number): Promise<ExecutionHistoryItem[]> {
-  return authFetch<ExecutionHistoryItem[]>(`/releases/${releaseId}/test-cases/${testcaseId}/executions`)
+  try {
+    return await authFetch<ExecutionHistoryItem[]>(`/releases/${releaseId}/test-cases/${testcaseId}/executions`)
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }

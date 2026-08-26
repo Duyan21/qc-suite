@@ -39,6 +39,9 @@ export function ReleaseDetailPage() {
   const [historyTarget, setHistoryTarget] = useState<{ id: number; code: string } | null>(null)
   const [history, setHistory] = useState<ExecutionHistoryItem[] | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
+  // Bumped after an execution so the open history panel re-fetches — neither
+  // historyTarget nor releaseId changes when a new execution is recorded.
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   const requestIdRef = useRef(0)
   const historyRequestIdRef = useRef(0)
 
@@ -82,7 +85,7 @@ export function ReleaseDetailPage() {
         if (historyRequestIdRef.current !== requestId) return
         setHistoryError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra')
       })
-  }, [historyTarget, releaseId])
+  }, [historyTarget, releaseId, historyRefreshKey])
 
   async function handleMarkCompleted() {
     try {
@@ -284,6 +287,7 @@ export function ReleaseDetailPage() {
         testCase={executeTarget}
         onExecuted={() => {
           load()
+          setHistoryRefreshKey((k) => k + 1)
           toast.success('Đã lưu kết quả thực thi.')
         }}
       />
@@ -294,8 +298,11 @@ export function ReleaseDetailPage() {
         }}
         releaseId={releaseId}
         testCase={removeTarget}
-        onRemoved={() => {
+        onRemoved={(removedId) => {
           load()
+          // The removed test case is no longer in the release, so its history
+          // panel can't meaningfully be refreshed — close it instead.
+          if (historyTarget?.id === removedId) setHistoryTarget(null)
           toast.success(`Đã bỏ ${removeTarget?.code ?? ''} khỏi release.`)
         }}
       />
