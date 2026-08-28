@@ -230,10 +230,11 @@ def seed_test_cases(db, requirements, tc_data):
     return test_cases
 
 
-def seed_defects(db, project, test_cases, requirements, defect_data, releases):
+def seed_defects(db, project, test_cases, requirements, defect_data, releases, users):
+    found_in = next(r for r in releases if r.version_name == "v1.0.0-SIT")
     fixed_in = next(r for r in releases if r.version_name == "v1.1.0-UAT").version_name
     defects = {}
-    for row in defect_data:
+    for i, row in enumerate(defect_data):
         description = (
             f"Steps to Reproduce: {row['steps_to_reproduce']}\n"
             f"Expected: {row['expected_result']}\n"
@@ -250,6 +251,8 @@ def seed_defects(db, project, test_cases, requirements, defect_data, releases):
             status=LEGACY_TO_CANONICAL_DEFECT_STATUS.get(row["status"], row["status"]),
             testcase_id=test_cases[row["tc_id"]].id if row["tc_id"] else None,
             requirement_id=requirements[row["req_id"]].id if row["req_id"] else None,
+            release_id=found_in.id,
+            assignee_user_id=users[i % len(users)].id,
             found_in_version=row["environment"],
             fixed_in_version=fixed_in if row["status"] in CLOSED_DEFECT_STATUSES else None,
             project_id=project.id,
@@ -339,7 +342,7 @@ def main():
         modules = seed_modules(db, project, req_data)
         requirements = seed_requirements(db, project, req_data, modules)
         test_cases = seed_test_cases(db, requirements, tc_data)
-        defects = seed_defects(db, project, test_cases, requirements, defect_data, releases)
+        defects = seed_defects(db, project, test_cases, requirements, defect_data, releases, users)
         results = seed_release_test_cases(db, releases, test_cases, defect_data, admin_user.id)
 
         # seed_release_test_cases has already flushed its ReleaseTestCase rows,
