@@ -11,8 +11,10 @@ class TraceabilityTestCaseItem(BaseModel):
     code: str
     title: str
     status: TraceabilityStatus
-    run_id: int | None = None
+    execution_id: int | None = None
     executed_at: datetime | None = None
+    release_id: int | None = None
+    release_version_name: str | None = None
 
 
 class TraceabilityRequirementItem(BaseModel):

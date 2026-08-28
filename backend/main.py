@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from services.evidence_storage import EVIDENCE_SUBDIR, UPLOADS_DIR
 
 from models.all_models import User
 from models.base import SessionLocal
@@ -10,7 +12,6 @@ from routers.auth import router as auth_router
 from routers.projects import router as projects_router
 from routers.releases import router as releases_router
 from routers.requirements import router as requirements_router
-from routers.test_runs import router as test_runs_router
 from routers.test_cases import router as test_cases_router
 from routers.defects import router as defects_router
 from routers.traceability import router as traceability_router
@@ -64,7 +65,6 @@ app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(releases_router)
 app.include_router(requirements_router)
-app.include_router(test_runs_router)
 app.include_router(test_cases_router)
 app.include_router(defects_router)
 app.include_router(traceability_router)
@@ -73,6 +73,14 @@ app.include_router(roles_router)
 app.include_router(users_router)
 app.include_router(modules_router)
 app.include_router(agent_router)
+
+# Mount only the evidence subtree, not all of UPLOADS_DIR — evidence images are
+# the only thing that is ever meant to be publicly served from here, and every
+# stored URL is already /uploads/evidence/<release_id>/<testcase_id>/<file>, so
+# this narrowing leaves existing URLs byte-identical.
+EVIDENCE_DIR = os.path.join(UPLOADS_DIR, EVIDENCE_SUBDIR)
+os.makedirs(EVIDENCE_DIR, exist_ok=True)
+app.mount("/uploads/evidence", StaticFiles(directory=EVIDENCE_DIR), name="uploads")
 
 
 @app.get("/health")

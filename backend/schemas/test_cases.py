@@ -7,7 +7,6 @@ from schemas.common import RequirementSummary
 
 TestCasePriority = Literal["High", "Medium", "Low"]
 TestCaseStatus = Literal["Draft", "Active", "Deprecated"]
-ExecutionResult = Literal["Pass", "Fail", "Skip", "Blocked"]
 
 
 class TestCaseCreate(BaseModel):
@@ -59,23 +58,6 @@ class TestCaseListResponse(BaseModel):
     total: int
     page: int
     limit: int
-
-
-class ExecuteTestCaseRequest(BaseModel):
-    run_id: int
-    result: ExecutionResult
-    note: str | None = None
-
-
-class ExecutionResultResponse(BaseModel):
-    id: int
-    run_id: int
-    testcase_id: int
-    result: str
-    note: str | None
-
-    class Config:
-        from_attributes = True
 
 
 class TestCaseExecutionHistoryItem(BaseModel):
