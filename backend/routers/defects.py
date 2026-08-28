@@ -40,6 +40,7 @@ def _display_name(user: User | None) -> str | None:
 @router.get("", response_model=DefectListResponse)
 def list_defects(
     project_id: int | None = None,
+    release_id: int | None = None,
     severity: str | None = None,
     status_filter: str | None = Query(None, alias="status"),
     requirement_id: int | None = None,
@@ -53,14 +54,25 @@ def list_defects(
     if project_id is not None and db.get(Project, project_id) is None:
         raise HTTPException(status_code=404, detail="project_id not found")
 
+    release = None
+    if release_id is not None:
+        release = db.get(Release, release_id)
+        if release is None:
+            raise HTTPException(status_code=404, detail="release_id not found")
+        if project_id is not None and release.project_id != project_id:
+            raise HTTPException(status_code=400, detail="release_id does not belong to project_id")
+
     query = db.query(Defect)
-    if project_id is not None:
-        check_permission(db, current_user, project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
-        query = query.filter(Defect.project_id == project_id)
+    effective_project_id = project_id if project_id is not None else (release.project_id if release else None)
+    if effective_project_id is not None:
+        check_permission(db, current_user, effective_project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
+        query = query.filter(Defect.project_id == effective_project_id)
     else:
         allowed_ids = permitted_project_ids(db, current_user, PermissionArea.DEFECTS, PermissionLevel.READ)
         if allowed_ids is not None:
             query = query.filter(Defect.project_id.in_(allowed_ids))
+    if release_id is not None:
+        query = query.filter(Defect.release_id == release_id)
     if severity is not None:
         query = query.filter(Defect.severity == severity)
     if status_filter is not None:
