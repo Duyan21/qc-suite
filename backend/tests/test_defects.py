@@ -673,6 +673,24 @@ def test_list_defects_rejects_release_id_from_different_project(client, auth_hea
     assert response.status_code == 400
 
 
+def test_list_defects_rejects_release_id_from_different_project_before_leaking_existence_to_unauthorized_caller(client, member_auth_headers, db_session, project):
+    from datetime import date
+
+    other_project = Project(name="Other", description="d", key="OTH3")
+    db_session.add(other_project)
+    db_session.commit()
+    db_session.refresh(other_project)
+
+    release = Release(project_id=other_project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    # member_user (behind member_auth_headers) has no membership on `project` either.
+    response = client.get(f"/defects?project_id={project.id}&release_id={release.id}", headers=member_auth_headers)
+    assert response.status_code == 403
+
+
 def test_list_defects_by_release_id_alone_checks_permission_on_releases_project(client, member_auth_headers, db_session, project):
     from datetime import date
 

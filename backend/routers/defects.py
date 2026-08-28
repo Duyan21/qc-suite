@@ -54,6 +54,12 @@ def list_defects(
     if project_id is not None and db.get(Project, project_id) is None:
         raise HTTPException(status_code=404, detail="project_id not found")
 
+    # Check permission on an explicitly-given project_id BEFORE resolving or
+    # validating release_id, so an unauthorized caller never learns whether a
+    # release_id exists or which project it belongs to.
+    if project_id is not None:
+        check_permission(db, current_user, project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
+
     release = None
     if release_id is not None:
         release = db.get(Release, release_id)
@@ -65,7 +71,10 @@ def list_defects(
     query = db.query(Defect)
     effective_project_id = project_id if project_id is not None else (release.project_id if release else None)
     if effective_project_id is not None:
-        check_permission(db, current_user, effective_project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
+        if project_id is None:
+            # release_id-alone path: project wasn't known above, so permission
+            # couldn't be checked until the release was resolved.
+            check_permission(db, current_user, effective_project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
         query = query.filter(Defect.project_id == effective_project_id)
     else:
         allowed_ids = permitted_project_ids(db, current_user, PermissionArea.DEFECTS, PermissionLevel.READ)
