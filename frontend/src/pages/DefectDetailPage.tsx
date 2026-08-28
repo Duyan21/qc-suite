@@ -172,6 +172,25 @@ export function DefectDetailPage() {
                 <dd>{defect.fixed_in_version ?? '—'}</dd>
               </div>
               <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Release</dt>
+                <dd>
+                  {defect.release ? (
+                    <Link
+                      to={`/testruns/${defect.release.id}`}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {defect.release.version_name}
+                    </Link>
+                  ) : (
+                    '—'
+                  )}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Assignee</dt>
+                <dd>{defect.assignee_name ?? '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Created</dt>
                 <dd>{formatDate(defect.created_at)}</dd>
               </div>
