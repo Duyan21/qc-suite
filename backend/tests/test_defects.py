@@ -1,7 +1,7 @@
 import re
 import uuid
 
-from models.all_models import Project, Requirement, TestCase
+from models.all_models import Defect, Project, Release, Requirement, TestCase, User
 from services.code_generator import next_code
 
 
@@ -444,3 +444,33 @@ def test_delete_defect_succeeds_with_full(client, db_session, member_user, proje
 
     response = client.delete(f"/defects/{created['id']}", headers=headers)
     assert response.status_code == 204
+
+
+def test_defect_release_and_assignee_columns_round_trip(db_session, project):
+    from datetime import date
+
+    release = Release(project_id=project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    user = User(email="assignee@example.com", hashed_password="x", full_name="Assignee")
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    defect = Defect(
+        code="DEF-RT-1",
+        title="Round trip",
+        severity="Low",
+        status="Open",
+        project_id=project.id,
+        release_id=release.id,
+        assignee_user_id=user.id,
+    )
+    db_session.add(defect)
+    db_session.commit()
+    db_session.refresh(defect)
+
+    assert defect.release_id == release.id
+    assert defect.assignee_user_id == user.id
