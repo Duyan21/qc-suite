@@ -36,6 +36,7 @@ export type ReleaseTestCaseItem = {
   current_result: CurrentResult
   added_by_name: string | null
   added_at: string
+  executed_by_name: string | null
 }
 
 export type EvidenceImageItem = {

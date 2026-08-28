@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,58 @@ import { RemoveTestCaseDialog } from '@/components/RemoveTestCaseDialog'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+type SortKey = 'code' | 'requirement' | 'result' | 'added_by' | 'executed_by'
+type SortState = { key: SortKey; dir: 'asc' | 'desc' } | null
+
+function sortValue(item: ReleaseTestCaseItem, key: SortKey): string {
+  switch (key) {
+    case 'code':
+      return item.testcase.code
+    case 'requirement':
+      return item.testcase.requirement?.req_id ?? ''
+    case 'result':
+      return item.current_result
+    case 'added_by':
+      return item.added_by_name ?? ''
+    case 'executed_by':
+      return item.executed_by_name ?? ''
+  }
+}
+
+const collator = new Intl.Collator('vi', { sensitivity: 'base' })
+
+function SortableHead({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  className,
+}: {
+  label: string
+  sortKey: SortKey
+  sort: SortState
+  onSort: (key: SortKey) => void
+  className?: string
+}) {
+  const active = sort?.key === sortKey
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="flex cursor-pointer items-center gap-1 select-none hover:text-foreground"
+      >
+        {label}
+        {active ? (
+          sort!.dir === 'asc' ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />
+        ) : (
+          <ArrowUpDown className="size-3.5 text-muted-foreground/50" />
+        )}
+      </button>
+    </TableHead>
+  )
+}
+
 export function ReleaseDetailPage() {
   const { id } = useParams()
   const toast = useToast()
@@ -42,8 +94,13 @@ export function ReleaseDetailPage() {
   // Bumped after an execution so the open history panel re-fetches — neither
   // historyTarget nor releaseId changes when a new execution is recorded.
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+  const [sort, setSort] = useState<SortState>(null)
   const requestIdRef = useRef(0)
   const historyRequestIdRef = useRef(0)
+
+  function toggleSort(key: SortKey) {
+    setSort((prev) => (prev?.key === key && prev.dir === 'asc' ? { key, dir: 'desc' } : { key, dir: 'asc' }))
+  }
 
   function load() {
     const requestId = ++requestIdRef.current
@@ -97,9 +154,22 @@ export function ReleaseDetailPage() {
     }
   }
 
+  const sortedItems = useMemo(() => {
+    if (!items || !sort) return items
+    const dir = sort.dir === 'asc' ? 1 : -1
+    const withOriginalIndex = items.map((item, index) => ({ item, index }))
+    withOriginalIndex.sort((a, b) => {
+      const cmp = collator.compare(sortValue(a.item, sort.key), sortValue(b.item, sort.key)) * dir
+      // Stable tie-break: fall back to the original (added-to-release) order
+      // instead of leaving equal keys in whatever order the sort algorithm happens to leave them.
+      return cmp !== 0 ? cmp : a.index - b.index
+    })
+    return withOriginalIndex.map(({ item }) => item)
+  }, [items, sort])
+
   if (loading && !release) return <p className="px-4 text-sm text-muted-foreground">Đang tải...</p>
   if (error) return <p className="px-4 text-sm text-destructive">{error}</p>
-  if (!release || !items) return null
+  if (!release || !items || !sortedItems) return null
 
   return (
     <div className="flex flex-col gap-4">
@@ -154,15 +224,16 @@ export function ReleaseDetailPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="pl-4">Test Case</TableHead>
-                <TableHead>Requirement</TableHead>
-                <TableHead>Kết quả</TableHead>
-                <TableHead>Thêm bởi</TableHead>
+                <SortableHead label="Test Case" sortKey="code" sort={sort} onSort={toggleSort} className="pl-4" />
+                <SortableHead label="Requirement" sortKey="requirement" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Kết quả" sortKey="result" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Thêm bởi" sortKey="added_by" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Thực thi bởi" sortKey="executed_by" sort={sort} onSort={toggleSort} />
                 <TableHead className="pr-4">Hành động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((item) => (
+              {sortedItems!.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="pl-4">
                     <Link to={`/testcases/${item.testcase.id}`} className="text-primary underline-offset-4 hover:underline">
@@ -194,6 +265,7 @@ export function ReleaseDetailPage() {
                     </button>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{item.added_by_name ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{item.executed_by_name ?? '—'}</TableCell>
                   <TableCell className="pr-4">
                     <div className="flex items-center gap-1">
                       <Button

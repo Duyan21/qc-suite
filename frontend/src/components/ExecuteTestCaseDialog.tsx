@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import {
   Dialog,
@@ -27,6 +27,7 @@ export function ExecuteTestCaseDialog({ open, onOpenChange, releaseId, testCase,
   const [images, setImages] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   function reset() {
     setResult('Pass')
@@ -105,13 +106,25 @@ export function ExecuteTestCaseDialog({ open, onOpenChange, releaseId, testCase,
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="execute-images">Ảnh minh chứng</Label>
             <input
+              ref={fileInputRef}
               id="execute-images"
               type="file"
               accept="image/png,image/jpeg,image/gif,image/webp"
               multiple
-              onChange={(e) => handleFilesSelected(e.target.files)}
-              className="text-sm"
+              onChange={(e) => {
+                handleFilesSelected(e.target.files)
+                e.target.value = ''
+              }}
+              className="hidden"
             />
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                Chọn ảnh
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {images.length > 0 ? `${images.length} ảnh đã chọn` : 'Không có tệp nào được chọn'}
+              </span>
+            </div>
             {images.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-2">
                 {images.map((image, index) => (

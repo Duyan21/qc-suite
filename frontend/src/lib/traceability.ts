@@ -9,6 +9,8 @@ export type TraceabilityTestCaseItem = {
   status: TraceabilityStatus
   execution_id: number | null
   executed_at: string | null
+  release_id: number | null
+  release_version_name: string | null
 }
 
 export type TraceabilityRequirementItem = {

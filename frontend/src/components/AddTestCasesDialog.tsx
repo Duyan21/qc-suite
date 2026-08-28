@@ -124,7 +124,7 @@ export function AddTestCasesDialog({ open, onOpenChange, releaseId, projectId, o
         onOpenChange(next)
       }}
     >
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto sm:max-w-lg md:max-w-xl lg:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Thêm test case vào release</DialogTitle>
           <DialogDescription>
@@ -152,11 +152,15 @@ export function AddTestCasesDialog({ open, onOpenChange, releaseId, projectId, o
             {requirementResults.map((req) => (
               <label
                 key={req.id}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                className="flex min-w-0 cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
               >
-                <Checkbox checked={selectedRequirementIds.has(req.id)} onCheckedChange={() => toggleRequirement(req.id)} />
-                <span className="font-medium">{req.req_id}</span>
-                <span className="truncate text-muted-foreground">{req.title}</span>
+                <Checkbox
+                  className="mt-0.5"
+                  checked={selectedRequirementIds.has(req.id)}
+                  onCheckedChange={() => toggleRequirement(req.id)}
+                />
+                <span className="shrink-0 whitespace-nowrap font-medium">{req.req_id}</span>
+                <span className="min-w-0 flex-1 break-words text-muted-foreground">{req.title}</span>
               </label>
             ))}
           </TabsContent>
@@ -168,11 +172,15 @@ export function AddTestCasesDialog({ open, onOpenChange, releaseId, projectId, o
             {testCaseResults.map((tc) => (
               <label
                 key={tc.id}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                className="flex min-w-0 cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
               >
-                <Checkbox checked={selectedTestCaseIds.has(tc.id)} onCheckedChange={() => toggleTestCase(tc.id)} />
-                <span className="font-medium">{tc.code}</span>
-                <span className="truncate text-muted-foreground">{tc.title}</span>
+                <Checkbox
+                  className="mt-0.5"
+                  checked={selectedTestCaseIds.has(tc.id)}
+                  onCheckedChange={() => toggleTestCase(tc.id)}
+                />
+                <span className="shrink-0 whitespace-nowrap font-medium">{tc.code}</span>
+                <span className="min-w-0 flex-1 break-words text-muted-foreground">{tc.title}</span>
               </label>
             ))}
           </TabsContent>

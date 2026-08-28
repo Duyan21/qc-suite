@@ -64,6 +64,7 @@ class ReleaseTestCaseItem(BaseModel):
     current_result: CurrentResult
     added_by_name: str | None
     added_at: datetime
+    executed_by_name: str | None = None
 
 
 class EvidenceImageItem(BaseModel):

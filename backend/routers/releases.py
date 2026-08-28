@@ -143,7 +143,13 @@ def update_release_status(
     return _release_response(db, release)
 
 
-def _rtc_item(rtc: ReleaseTestCase, tc: TestCase, requirement: Requirement | None, added_by_user: User | None) -> ReleaseTestCaseItem:
+def _rtc_item(
+    rtc: ReleaseTestCase,
+    tc: TestCase,
+    requirement: Requirement | None,
+    added_by_user: User | None,
+    executed_by_user: User | None,
+) -> ReleaseTestCaseItem:
     return ReleaseTestCaseItem(
         id=rtc.id,
         testcase=ReleaseTestCaseTestCase(
@@ -153,6 +159,7 @@ def _rtc_item(rtc: ReleaseTestCase, tc: TestCase, requirement: Requirement | Non
         current_result=rtc.current_result,
         added_by_name=_display_name(added_by_user),
         added_at=rtc.added_at,
+        executed_by_name=_display_name(executed_by_user),
     )
 
 
@@ -161,6 +168,11 @@ def _release_test_case_rows_response(db: Session, release_id: int, testcase_ids:
         db.query(ReleaseTestCase, TestCase)
         .join(TestCase, ReleaseTestCase.testcase_id == TestCase.id)
         .filter(ReleaseTestCase.release_id == release_id, ReleaseTestCase.testcase_id.in_(testcase_ids))
+        # Stable default order: the moment the test case was added to the
+        # release, not whatever order the current_result UPDATE happens to
+        # leave the underlying heap scan in — otherwise the row visibly jumps
+        # position the instant someone records a Pass/Fail for it.
+        .order_by(ReleaseTestCase.added_at.asc(), ReleaseTestCase.id.asc())
         .all()
         if testcase_ids
         else []
@@ -172,9 +184,34 @@ def _release_test_case_rows_response(db: Session, release_id: int, testcase_ids:
         else {}
     )
     user_ids = {rtc.added_by for rtc, _ in rows if rtc.added_by is not None}
+
+    rtc_ids = [rtc.id for rtc, _ in rows]
+    # Last execution per release_test_case = the one with the highest id in
+    # that group. Iterating ascending by id and overwriting the dict entry
+    # each time leaves the highest-id row per group, regardless of how the
+    # groups interleave in the result set.
+    latest_execution_by_rtc: dict[int, ReleaseTestCaseExecution] = {}
+    if rtc_ids:
+        for execution in (
+            db.query(ReleaseTestCaseExecution)
+            .filter(ReleaseTestCaseExecution.release_test_case_id.in_(rtc_ids))
+            .order_by(ReleaseTestCaseExecution.id.asc())
+            .all()
+        ):
+            latest_execution_by_rtc[execution.release_test_case_id] = execution
+    user_ids.update(
+        e.executed_by for e in latest_execution_by_rtc.values() if e.executed_by is not None
+    )
+
     users_by_id = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
     return [
-        _rtc_item(rtc, tc, requirements_by_id.get(tc.requirement_id), users_by_id.get(rtc.added_by))
+        _rtc_item(
+            rtc,
+            tc,
+            requirements_by_id.get(tc.requirement_id),
+            users_by_id.get(rtc.added_by),
+            users_by_id.get(latest_execution_by_rtc[rtc.id].executed_by) if rtc.id in latest_execution_by_rtc else None,
+        )
         for rtc, tc in rows
     ]
 
