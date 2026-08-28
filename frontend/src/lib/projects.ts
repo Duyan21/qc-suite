@@ -6,13 +6,10 @@ export type Project = {
   description: string | null
   key: string
   lead_user_id: number | null
-  modules: string[]
   status: string
   require_requirement_link: boolean
   auto_resolve_days: number | null
   ai_impact_suggestions: boolean
-  slack_alerts_enabled: boolean
-  retention_days: number
   default_severity: string
   created_at: string
 }
@@ -22,13 +19,10 @@ export type ProjectUpdatePayload = {
   description?: string
   key: string
   lead_user_id?: number | null
-  modules: string[]
   status: string
   require_requirement_link: boolean
   auto_resolve_days?: number | null
   ai_impact_suggestions: boolean
-  slack_alerts_enabled: boolean
-  retention_days: number
   default_severity: string
 }
 

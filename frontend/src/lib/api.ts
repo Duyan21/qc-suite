@@ -81,3 +81,22 @@ export async function authFetch<T>(path: string, options: RequestOptions = {}): 
     },
   })
 }
+
+export async function authFetchMultipart<T>(path: string, formData: FormData): Promise<T> {
+  const token = getToken()
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token ?? ''}` },
+    body: formData,
+  })
+
+  if (!response.ok) {
+    const message = await extractErrorMessage(response)
+    if (response.status === 401) {
+      clearToken()
+      window.location.href = '/login'
+    }
+    throw new Error(message)
+  }
+  return (await response.json()) as T
+}

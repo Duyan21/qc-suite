@@ -7,6 +7,7 @@ import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { RequirementDetailPage } from '@/pages/RequirementDetailPage'
 import { TestCaseDetailPage } from '@/pages/TestCaseDetailPage'
 import { DefectDetailPage } from '@/pages/DefectDetailPage'
+import { ReleaseDetailPage } from '@/pages/ReleaseDetailPage'
 import { NAV_SECTIONS } from '@/nav'
 import { ToastProvider } from '@/lib/toast'
 
@@ -34,6 +35,7 @@ function App() {
             <Route path="/requirements/:id" element={<RequirementDetailPage />} />
             <Route path="/testcases/:id" element={<TestCaseDetailPage />} />
             <Route path="/defects/:id" element={<DefectDetailPage />} />
+            <Route path="/testruns/:id" element={<ReleaseDetailPage />} />
           </Route>
         </Routes>
       </ToastProvider>

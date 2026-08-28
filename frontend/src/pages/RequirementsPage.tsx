@@ -193,6 +193,7 @@ export function RequirementsPage() {
                 <TableHead className="pl-4">ID</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Module</TableHead>
                 <TableHead>Version</TableHead>
                 <TableHead>Linked TC</TableHead>
                 <TableHead>Updated</TableHead>
@@ -211,6 +212,7 @@ export function RequirementsPage() {
                   <TableCell>
                     <Badge className={REQUIREMENT_STATUS_BADGE_CLASS[req.status] ?? ''}>{req.status}</Badge>
                   </TableCell>
+                  <TableCell>{req.module_name ?? '—'}</TableCell>
                   <TableCell>v{req.version}</TableCell>
                   <TableCell>{tcCountByReqId.get(req.req_id) ?? '—'}</TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(req.created_at)}</TableCell>

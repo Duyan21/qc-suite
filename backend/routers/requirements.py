@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from models.all_models import Project, Requirement, User
+from models.all_models import Module, Project, Requirement, User
 from models.base import get_db
 from schemas.requirements import (
     RequirementCreate,
@@ -19,6 +19,40 @@ router = APIRouter(
     tags=["requirements"],
     dependencies=[Depends(get_current_user)],
 )
+
+
+def _module_name_map(db: Session, requirements: list[Requirement]) -> dict[int, str]:
+    module_ids = {r.module_id for r in requirements if r.module_id is not None}
+    if not module_ids:
+        return {}
+    modules = db.query(Module).filter(Module.id.in_(module_ids)).all()
+    return {m.id: m.name for m in modules}
+
+
+def _requirement_response(req: Requirement, module_name: str | None) -> RequirementResponse:
+    return RequirementResponse(
+        id=req.id,
+        req_id=req.req_id,
+        version=req.version,
+        title=req.title,
+        description=req.description,
+        module_id=req.module_id,
+        module_name=module_name,
+        status=req.status,
+        is_current=req.is_current,
+        change_note=req.change_note,
+        changed_by=req.changed_by,
+        previous_version_id=req.previous_version_id,
+        project_id=req.project_id,
+        created_at=req.created_at,
+    )
+
+
+def _validate_module(db: Session, module_id: int, project_id: int) -> Module:
+    module = db.get(Module, module_id)
+    if module is None or module.project_id != project_id:
+        raise HTTPException(status_code=400, detail="module_id not found for this project")
+    return module
 
 
 @router.get("", response_model=RequirementListResponse)
@@ -56,7 +90,13 @@ def list_requirements(
         .limit(limit)
         .all()
     )
-    return RequirementListResponse(items=items, total=total, page=page, limit=limit)
+    name_map = _module_name_map(db, items)
+    return RequirementListResponse(
+        items=[_requirement_response(r, name_map.get(r.module_id)) for r in items],
+        total=total,
+        page=page,
+        limit=limit,
+    )
 
 
 @router.get("/{id}", response_model=RequirementResponse)
@@ -69,7 +109,11 @@ def get_requirement(
     if req is None:
         raise HTTPException(status_code=404, detail="Requirement not found")
     check_permission(db, current_user, req.project_id, PermissionArea.REQUIREMENTS, PermissionLevel.READ)
-    return req
+    module_name = None
+    if req.module_id is not None:
+        module = db.get(Module, req.module_id)
+        module_name = module.name if module else None
+    return _requirement_response(req, module_name)
 
 
 @router.post("", response_model=RequirementResponse, status_code=status.HTTP_201_CREATED)
@@ -81,6 +125,7 @@ def create_requirement(
     if db.get(Project, payload.project_id) is None:
         raise HTTPException(status_code=400, detail="project_id not found")
     check_permission(db, current_user, payload.project_id, PermissionArea.REQUIREMENTS, PermissionLevel.EDIT)
+    module = _validate_module(db, payload.module_id, payload.project_id)
 
     req_id = next_code(db, Requirement, "req_id", "REQ")
     req = Requirement(
@@ -88,7 +133,7 @@ def create_requirement(
         version=1,
         title=payload.title,
         description=payload.description,
-        module=payload.module,
+        module_id=module.id,
         status=payload.status,
         is_current=True,
         project_id=payload.project_id,
@@ -96,7 +141,7 @@ def create_requirement(
     db.add(req)
     db.commit()
     db.refresh(req)
-    return req
+    return _requirement_response(req, module.name)
 
 
 @router.put("/{id}", response_model=RequirementResponse)
@@ -112,6 +157,7 @@ def update_requirement(
     if not old.is_current:
         raise HTTPException(status_code=400, detail="Requirement is not the current version")
     check_permission(db, current_user, old.project_id, PermissionArea.REQUIREMENTS, PermissionLevel.EDIT)
+    module = _validate_module(db, payload.module_id, old.project_id)
 
     old.is_current = False
 
@@ -120,7 +166,7 @@ def update_requirement(
         version=old.version + 1,
         title=payload.title,
         description=payload.description,
-        module=old.module,
+        module_id=module.id,
         status=payload.status,
         is_current=True,
         change_note=payload.change_note,
@@ -131,7 +177,7 @@ def update_requirement(
     db.add(new)
     db.commit()
     db.refresh(new)
-    return new
+    return _requirement_response(new, module.name)
 
 
 @router.delete("/{id}", response_model=RequirementResponse)
@@ -154,7 +200,7 @@ def delete_requirement(
         version=old.version + 1,
         title=old.title,
         description=old.description,
-        module=old.module,
+        module_id=old.module_id,
         status="Deprecated",
         is_current=True,
         change_note=None,
@@ -165,7 +211,11 @@ def delete_requirement(
     db.add(new)
     db.commit()
     db.refresh(new)
-    return new
+    module_name = None
+    if new.module_id is not None:
+        module = db.get(Module, new.module_id)
+        module_name = module.name if module else None
+    return _requirement_response(new, module_name)
 
 
 @router.get("/{req_id}/history", response_model=list[RequirementResponse])
@@ -183,4 +233,5 @@ def get_requirement_history(
     if not versions:
         raise HTTPException(status_code=404, detail="Requirement not found")
     check_permission(db, current_user, versions[0].project_id, PermissionArea.REQUIREMENTS, PermissionLevel.READ)
-    return versions
+    name_map = _module_name_map(db, versions)
+    return [_requirement_response(v, name_map.get(v.module_id)) for v in versions]

@@ -105,7 +105,20 @@ export function RequirementRow({
             <div key={tc.id} className="flex items-center gap-2 py-1 text-sm">
               <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">{tc.code}</span>
               <span className="flex-1 truncate">{tc.title}</span>
-              <Badge className={cn(TC_STATUS_BADGE_CLASS[tc.status])}>{TC_STATUS_LABEL[tc.status]}</Badge>
+              {tc.release_id !== null ? (
+                <Link
+                  to={`/testruns/${tc.release_id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex shrink-0 items-center gap-1.5 hover:opacity-80"
+                >
+                  {tc.release_version_name && (
+                    <span className="text-xs text-muted-foreground">{tc.release_version_name}</span>
+                  )}
+                  <Badge className={cn(TC_STATUS_BADGE_CLASS[tc.status])}>{TC_STATUS_LABEL[tc.status]}</Badge>
+                </Link>
+              ) : (
+                <Badge className={cn(TC_STATUS_BADGE_CLASS[tc.status])}>{TC_STATUS_LABEL[tc.status]}</Badge>
+              )}
               <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
                 {formatRunDate(tc.executed_at)}
               </span>

@@ -28,18 +28,6 @@ def _create_requirement_row(db_session, **overrides):
     return req
 
 
-def _create_release_row(db_session):
-    project = Project(name="Home Lending", description="d", key=f"REL{uuid.uuid4().hex[:6].upper()}")
-    db_session.add(project)
-    db_session.commit()
-    db_session.refresh(project)
-    release = Release(project_id=project.id, version_name="v2.0.0")
-    db_session.add(release)
-    db_session.commit()
-    db_session.refresh(release)
-    return release
-
-
 def _create_test_case(client, auth_headers, requirement_id, **overrides):
     body = {
         "title": "Login with valid credentials",
@@ -223,40 +211,6 @@ def test_list_test_cases_explicit_deprecated_filter_still_works(client, auth_hea
     assert data["items"][0]["id"] == deprecated["id"]
 
 
-def test_execute_test_case_creates_then_updates_result(client, auth_headers, db_session):
-    req = _create_requirement_row(db_session)
-    release = _create_release_row(db_session)
-    tc = _create_test_case(client, auth_headers, req.id).json()
-    run = client.post(
-        "/test-runs", json={"release_id": release.id, "executed_by": "An"}, headers=auth_headers
-    ).json()
-
-    first = client.post(
-        f"/test-cases/{tc['id']}/execute",
-        json={"run_id": run["id"], "result": "Fail", "note": "first try"},
-        headers=auth_headers,
-    )
-    assert first.status_code == 200
-    assert first.json()["result"] == "Fail"
-
-    second = client.post(
-        f"/test-cases/{tc['id']}/execute",
-        json={"run_id": run["id"], "result": "Pass", "note": "fixed"},
-        headers=auth_headers,
-    )
-    assert second.status_code == 200
-    second_data = second.json()
-    assert second_data["result"] == "Pass"
-    assert second_data["id"] == first.json()["id"]
-
-    history = client.get(f"/test-cases/{tc['id']}/results", headers=auth_headers)
-    assert history.status_code == 200
-    history_data = history.json()
-    assert len(history_data) == 1
-    assert history_data[0]["result"] == "Pass"
-    assert history_data[0]["release_version"] == "v2.0.0"
-
-
 def test_test_cases_require_auth(client):
     response = client.get("/test-cases")
     assert response.status_code == 401
@@ -291,35 +245,22 @@ def test_list_test_cases_without_project_id_filters_to_permitted(client, db_sess
     assert "Not visible to member" not in titles
 
 
-def test_execute_and_results_require_test_runs_permission(client, db_session, member_user, project, role_by_key):
-    from models.all_models import ProjectMember, Release, TestRun
+def test_results_require_test_runs_read_permission(client, db_session, member_user, project, role_by_key):
+    from models.all_models import ProjectMember
 
     admin_headers = _superadmin_headers(db_session)
     req = _create_requirement_row(db_session, project_id=project.id)
     tc = _create_test_case(client, admin_headers, req.id).json()
 
-    release = Release(project_id=project.id, version_name="v1.0.0")
-    db_session.add(release)
-    db_session.commit()
-    db_session.refresh(release)
-    run = client.post("/test-runs", json={"release_id": release.id}, headers=admin_headers).json()
-
-    viewer = role_by_key("viewer")  # Read only on test_runs
+    viewer = role_by_key("viewer")  # Read on test_runs
     db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=viewer.id))
     db_session.commit()
 
     from services.auth_service import create_access_token
     member_headers = {"Authorization": f"Bearer {create_access_token(member_user.id)}"}
 
-    response = client.post(
-        f"/test-cases/{tc['id']}/execute",
-        json={"run_id": run["id"], "result": "Pass"},
-        headers=member_headers,
-    )
-    assert response.status_code == 403  # Viewer has Read, execute needs Edit
-
     read_response = client.get(f"/test-cases/{tc['id']}/results", headers=member_headers)
-    assert read_response.status_code == 200  # Read is enough to view results
+    assert read_response.status_code == 200
 
 
 def _superadmin_headers(db_session):

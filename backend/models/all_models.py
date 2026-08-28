@@ -1,8 +1,7 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean,
-    ForeignKey, TIMESTAMP, UniqueConstraint, func
+    Column, Integer, String, Text, Boolean, Date,
+    ForeignKey, TIMESTAMP, UniqueConstraint, Index, func
 )
-from sqlalchemy.dialects.postgresql import ARRAY
 from pgvector.sqlalchemy import Vector
 from .base import Base
 
@@ -29,13 +28,10 @@ class Project(Base):
     description = Column(Text)
     key = Column(String(20), unique=True, nullable=False)
     lead_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    modules = Column(ARRAY(String), default=list)
     status = Column(String(20), default="Active")
     require_requirement_link = Column(Boolean, default=True)
     auto_resolve_days = Column(Integer, nullable=True)
     ai_impact_suggestions = Column(Boolean, default=True)
-    slack_alerts_enabled = Column(Boolean, default=False)
-    retention_days = Column(Integer, default=365)
     default_severity = Column(String(20), default="Medium")
     created_at = Column(TIMESTAMP, server_default=func.now())
 
@@ -80,7 +76,23 @@ class Release(Base):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     version_name = Column(String(50), nullable=False)
     note = Column(Text)
+    status = Column(String(20), default="New")
+    target_date = Column(Date, nullable=True)
+    owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
+
+
+class Module(Base):
+    __tablename__ = "modules"
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    __table_args__ = (
+        Index("uq_modules_project_lower_name", "project_id", func.lower(name), unique=True),
+    )
 
 
 class Requirement(Base):
@@ -95,7 +107,7 @@ class Requirement(Base):
     version = Column(Integer, nullable=False)
     title = Column(Text, nullable=False)
     description = Column(Text, nullable=False)
-    module = Column(String(100), nullable=True)
+    module_id = Column(Integer, ForeignKey("modules.id", ondelete="SET NULL"), nullable=True)
     status = Column(String(20), default="Draft")
     is_current = Column(Boolean, default=False)
     change_note = Column(Text)
@@ -117,7 +129,6 @@ class TestCase(Base):
     expected_result = Column(Text, nullable=False)
     priority = Column(String(10))
     status = Column(String(20), default="Draft")
-    module = Column(String(100), nullable=True)
     requirement_id = Column(
         Integer, ForeignKey("requirements.id"), nullable=True
     )
@@ -136,7 +147,6 @@ class Defect(Base):
     description = Column(Text)
     severity = Column(String(20))
     status = Column(String(20), default="Open")
-    module = Column(String(100), nullable=True)
     testcase_id = Column(Integer, ForeignKey("test_cases.id"), nullable=True)
     requirement_id = Column(Integer, ForeignKey("requirements.id"), nullable=True)
     found_in_version = Column(String(50))
@@ -144,24 +154,44 @@ class Defect(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 
-class TestRun(Base):
-    __tablename__ = "test_runs"
-
-    id = Column(Integer, primary_key=True)
-    release_id = Column(Integer, ForeignKey("releases.id"), nullable=False)
-    executed_at = Column(TIMESTAMP, server_default=func.now())
-    executed_by = Column(String(100))
-    note = Column(Text)
-
-
-class TestRunResult(Base):
-    __tablename__ = "test_run_results"
+class ReleaseTestCase(Base):
+    __tablename__ = "release_test_cases"
     __table_args__ = (
-        UniqueConstraint("run_id", "testcase_id", name="uq_run_testcase"),
+        UniqueConstraint("release_id", "testcase_id", name="uq_release_testcase"),
     )
 
     id = Column(Integer, primary_key=True)
-    run_id = Column(Integer, ForeignKey("test_runs.id"), nullable=False)
+    release_id = Column(Integer, ForeignKey("releases.id"), nullable=False)
     testcase_id = Column(Integer, ForeignKey("test_cases.id"), nullable=False)
-    result = Column(String(20))
+    current_result = Column(String(10), default="NotRun")
+    added_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    added_at = Column(TIMESTAMP, server_default=func.now())
+
+
+class ReleaseTestCaseExecution(Base):
+    __tablename__ = "release_test_case_executions"
+
+    id = Column(Integer, primary_key=True)
+    release_test_case_id = Column(Integer, ForeignKey("release_test_cases.id"), nullable=False)
+    result = Column(String(10), nullable=False)
     note = Column(Text)
+    executed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    executed_at = Column(TIMESTAMP, server_default=func.now())
+
+
+class ExecutionEvidenceImage(Base):
+    __tablename__ = "execution_evidence_images"
+
+    id = Column(Integer, primary_key=True)
+    execution_id = Column(Integer, ForeignKey("release_test_case_executions.id"), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    uploaded_at = Column(TIMESTAMP, server_default=func.now())
+
+
+class AgentCache(Base):
+    __tablename__ = "agent_cache"
+
+    id = Column(Integer, primary_key=True)
+    cache_key = Column(String(64), unique=True, nullable=False)
+    result_json = Column(Text, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())

@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProjectsTab } from '@/pages/admin/ProjectsTab'
 import { UsersAccessTab } from '@/pages/admin/UsersAccessTab'
 import { RolesPermissionsTab } from '@/pages/admin/RolesPermissionsTab'
+import { SystemAccessTab } from '@/pages/admin/SystemAccessTab'
 
 export function AdminPage() {
   return (
@@ -10,6 +11,7 @@ export function AdminPage() {
         <TabsTrigger value="projects">Projects</TabsTrigger>
         <TabsTrigger value="users">Users & Access</TabsTrigger>
         <TabsTrigger value="roles">Roles & Permissions</TabsTrigger>
+        <TabsTrigger value="system">System Access</TabsTrigger>
       </TabsList>
       <TabsContent value="projects">
         <ProjectsTab />
@@ -19,6 +21,9 @@ export function AdminPage() {
       </TabsContent>
       <TabsContent value="roles">
         <RolesPermissionsTab />
+      </TabsContent>
+      <TabsContent value="system">
+        <SystemAccessTab />
       </TabsContent>
     </Tabs>
   )

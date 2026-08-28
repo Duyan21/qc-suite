@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models.all_models import Project, Requirement, TestCase, TestRun, TestRunResult
+from models.all_models import Module, Project, Release, Requirement, ReleaseTestCase, ReleaseTestCaseExecution, TestCase
 from models.base import get_db
 from schemas.traceability import (
     TraceabilityRequirementItem,
@@ -44,9 +44,18 @@ def get_traceability(
     requirements = (
         db.query(Requirement)
         .filter(Requirement.project_id == project_id, Requirement.is_current == True)
-        .order_by(Requirement.module.nulls_last(), Requirement.id)
+        .order_by(Requirement.id)
         .all()
     )
+
+    module_ids = {r.module_id for r in requirements if r.module_id is not None}
+    module_name_by_id: dict[int, str] = {}
+    if module_ids:
+        module_name_by_id = {
+            m.id: m.name for m in db.query(Module).filter(Module.id.in_(module_ids)).all()
+        }
+    requirements.sort(key=lambda r: (module_name_by_id.get(r.module_id) is None, module_name_by_id.get(r.module_id, ""), r.id))
+
     requirement_ids = [r.id for r in requirements]
 
     test_cases = (
@@ -62,38 +71,49 @@ def get_traceability(
     )
     test_case_ids = [tc.id for tc in test_cases]
 
-    latest_by_tc: dict[int, tuple[str | None, int, object]] = {}
+    latest_by_tc: dict[int, tuple[str | None, int, object, int, str | None]] = {}
     if test_case_ids:
         result_query = (
             db.query(
-                TestRunResult.testcase_id.label("testcase_id"),
-                TestRunResult.result.label("result"),
-                TestRun.id.label("run_id"),
-                TestRun.executed_at.label("executed_at"),
+                ReleaseTestCase.testcase_id.label("testcase_id"),
+                ReleaseTestCaseExecution.result.label("result"),
+                ReleaseTestCaseExecution.id.label("execution_id"),
+                ReleaseTestCaseExecution.executed_at.label("executed_at"),
+                ReleaseTestCase.release_id.label("release_id"),
+                Release.version_name.label("release_version_name"),
                 func.row_number()
                 .over(
-                    partition_by=TestRunResult.testcase_id,
+                    partition_by=ReleaseTestCase.testcase_id,
                     # Postgres func.now() is stable within a transaction, so
-                    # executed_at alone can tie for runs created in the same
-                    # transaction (e.g. test fixtures). Break ties with the
-                    # run id, which is monotonically increasing.
-                    order_by=(TestRun.executed_at.desc(), TestRun.id.desc()),
+                    # executed_at alone can tie for executions created in the
+                    # same transaction (e.g. test fixtures). Break ties with
+                    # the execution id, which is monotonically increasing.
+                    order_by=(ReleaseTestCaseExecution.executed_at.desc(), ReleaseTestCaseExecution.id.desc()),
                 )
                 .label("rn"),
             )
-            .join(TestRun, TestRunResult.run_id == TestRun.id)
-            .filter(TestRunResult.testcase_id.in_(test_case_ids))
+            .join(ReleaseTestCaseExecution, ReleaseTestCaseExecution.release_test_case_id == ReleaseTestCase.id)
+            .join(Release, Release.id == ReleaseTestCase.release_id)
+            .filter(ReleaseTestCase.testcase_id.in_(test_case_ids))
         )
         if release_id is not None:
-            result_query = result_query.filter(TestRun.release_id == release_id)
+            result_query = result_query.filter(ReleaseTestCase.release_id == release_id)
         ranked = result_query.subquery()
         latest_rows = (
-            db.query(ranked.c.testcase_id, ranked.c.result, ranked.c.run_id, ranked.c.executed_at)
+            db.query(
+                ranked.c.testcase_id,
+                ranked.c.result,
+                ranked.c.execution_id,
+                ranked.c.executed_at,
+                ranked.c.release_id,
+                ranked.c.release_version_name,
+            )
             .filter(ranked.c.rn == 1)
             .all()
         )
         latest_by_tc = {
-            row.testcase_id: (row.result, row.run_id, row.executed_at) for row in latest_rows
+            row.testcase_id: (row.result, row.execution_id, row.executed_at, row.release_id, row.release_version_name)
+            for row in latest_rows
         }
 
     tc_by_requirement: dict[int, list[TestCase]] = defaultdict(list)
@@ -105,15 +125,19 @@ def get_traceability(
         linked = tc_by_requirement.get(req.id, [])
         tc_items = []
         for tc in linked:
-            result, run_id, executed_at = latest_by_tc.get(tc.id, (None, None, None))
+            result, execution_id, executed_at, ex_release_id, ex_release_version_name = latest_by_tc.get(
+                tc.id, (None, None, None, None, None)
+            )
             tc_items.append(
                 TraceabilityTestCaseItem(
                     id=tc.id,
                     code=tc.code,
                     title=tc.title,
                     status=_status_for_result(result),
-                    run_id=run_id,
+                    execution_id=execution_id,
                     executed_at=executed_at,
+                    release_id=ex_release_id,
+                    release_version_name=ex_release_version_name,
                 )
             )
         covered_count = sum(1 for item in tc_items if item.status == "covered")
@@ -124,7 +148,7 @@ def get_traceability(
                 req_id=req.req_id,
                 version=req.version,
                 title=req.title,
-                module=req.module,
+                module=module_name_by_id.get(req.module_id),
                 status=req.status,
                 is_uncovered=(total == 0),
                 coverage_percent=(covered_count / total) if total else 0.0,

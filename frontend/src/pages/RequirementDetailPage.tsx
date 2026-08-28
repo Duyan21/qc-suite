@@ -27,7 +27,29 @@ import { EditRequirementDialog } from '@/components/EditRequirementDialog'
 import { DeleteRequirementDialog } from '@/components/DeleteRequirementDialog'
 import { useToast } from '@/lib/toast'
 
-type LinkedTestCase = { id: number; code: string; title: string; status: TraceabilityStatus | null }
+type LinkedTestCase = {
+  id: number
+  code: string
+  title: string
+  status: TraceabilityStatus | null
+  release_id: number | null
+  release_version_name: string | null
+}
+
+function ResultBadge({ status }: { status: LinkedTestCase['status'] }) {
+  if (status === 'covered') {
+    return (
+      <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">Pass</Badge>
+    )
+  }
+  if (status === 'failed') {
+    return <Badge className="bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400">Fail</Badge>
+  }
+  if (status === 'skipped' || status === 'not_run') {
+    return <Badge variant="outline">Chưa chạy</Badge>
+  }
+  return <Badge variant="outline">—</Badge>
+}
 
 export function RequirementDetailPage() {
   const { id } = useParams()
@@ -108,10 +130,19 @@ export function RequirementDetailPage() {
             code: tc.code,
             title: tc.title,
             status: tc.status,
+            release_id: tc.release_id,
+            release_version_name: tc.release_version_name,
           }))
         })
       : listTestCases({ requirement_id: req.id, limit: 200 }).then((result) =>
-          result.items.map((tc) => ({ id: tc.id, code: tc.code, title: tc.title, status: null })),
+          result.items.map((tc) => ({
+            id: tc.id,
+            code: tc.code,
+            title: tc.title,
+            status: null,
+            release_id: null,
+            release_version_name: null,
+          })),
         )
 
     load
@@ -285,20 +316,19 @@ export function RequirementDetailPage() {
                         </TableCell>
                         <TableCell>{tc.title}</TableCell>
                         <TableCell className="pr-0 text-right">
-                          {tc.status === 'covered' && (
-                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                              Pass
-                            </Badge>
+                          {tc.release_id !== null ? (
+                            <Link
+                              to={`/testruns/${tc.release_id}`}
+                              className="inline-flex items-center gap-1.5 hover:opacity-80"
+                            >
+                              {tc.release_version_name && (
+                                <span className="text-xs text-muted-foreground">{tc.release_version_name}</span>
+                              )}
+                              <ResultBadge status={tc.status} />
+                            </Link>
+                          ) : (
+                            <ResultBadge status={tc.status} />
                           )}
-                          {tc.status === 'failed' && (
-                            <Badge className="bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400">
-                              Fail
-                            </Badge>
-                          )}
-                          {(tc.status === 'skipped' || tc.status === 'not_run') && (
-                            <Badge variant="outline">Chưa chạy</Badge>
-                          )}
-                          {tc.status === null && <Badge variant="outline">—</Badge>}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -318,6 +348,10 @@ export function RequirementDetailPage() {
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">ID</dt>
                 <dd>{requirement.req_id}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Module</dt>
+                <dd>{requirement.module_name ?? '—'}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Status</dt>
