@@ -143,7 +143,6 @@ def get_release_burndown(release_id: int, db: Session = Depends(get_db), current
     if total == 0:
         return []
 
-    first_execution_dates: list[date] = []
     rows = (
         db.query(ReleaseTestCaseExecution.release_test_case_id, func.min(ReleaseTestCaseExecution.executed_at))
         .filter(ReleaseTestCaseExecution.release_test_case_id.in_(rtc_ids))
