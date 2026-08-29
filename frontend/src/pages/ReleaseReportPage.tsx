@@ -45,6 +45,7 @@ export function ReleaseReportPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const requestIdRef = useRef(0)
+  const releasesRequestIdRef = useRef(0)
 
   useEffect(() => {
     if (!project) {
@@ -52,15 +53,21 @@ export function ReleaseReportPage() {
       setSelectedId(null)
       return
     }
+    const requestId = ++releasesRequestIdRef.current
+    setError(null)
     listReleases(project.id)
       .then((result) => {
+        if (releasesRequestIdRef.current !== requestId) return
         setReleases(result)
         setSelectedId((current) => {
           if (current && result.some((r) => r.id === current)) return current
           return pickDefaultRelease(result)?.id ?? null
         })
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra'))
+      .catch((err) => {
+        if (releasesRequestIdRef.current !== requestId) return
+        setError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra')
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id])
 
@@ -124,9 +131,9 @@ export function ReleaseReportPage() {
 
   const filteredDefects = useMemo(() => {
     if (!filter) return sortedDefects
-    if (filter.type === 'severity') return sortedDefects.filter((d) => d.severity === filter.value)
+    if (filter.type === 'severity') return openDefects.filter((d) => d.severity === filter.value)
     return sortedDefects.filter((d) => d.status === filter.value)
-  }, [sortedDefects, filter])
+  }, [sortedDefects, openDefects, filter])
 
   const passRate =
     selectedRelease && selectedRelease.total_test_cases > 0
