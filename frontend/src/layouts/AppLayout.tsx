@@ -152,8 +152,8 @@ export function AppLayout() {
 
   return (
     <CurrentProjectProvider>
-      <div className="flex h-svh flex-col overflow-hidden md:flex-row">
-        <header className="dark sticky top-0 z-30 flex shrink-0 items-center gap-2.5 border-b border-sidebar-border bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden">
+      <div className="flex h-svh flex-col overflow-hidden md:flex-row print:h-auto print:overflow-visible print:block">
+        <header className="dark sticky top-0 z-30 flex shrink-0 items-center gap-2.5 border-b border-sidebar-border bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden print:hidden">
           <Button
             type="button"
             variant="ghost"
@@ -180,14 +180,14 @@ export function AppLayout() {
 
         <aside
           className={cn(
-            'dark fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 md:static md:z-auto md:w-56 md:translate-x-0',
+            'dark fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-200 md:static md:z-auto md:w-56 md:translate-x-0 print:hidden',
             mobileNavOpen && 'translate-x-0',
           )}
         >
           {sidebarContent}
         </aside>
 
-        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6">
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 print:overflow-visible print:p-0">
           <Outlet />
         </main>
       </div>

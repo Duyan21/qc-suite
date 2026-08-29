@@ -10,12 +10,13 @@ type DefectListProps = {
   items: DefectListItem[]
   page: number
   onPageChange: (page: number) => void
+  pageSize?: number
 }
 
-export function DefectList({ items, page, onPageChange }: DefectListProps) {
+export function DefectList({ items, page, onPageChange, pageSize = PAGE_SIZE }: DefectListProps) {
   const navigate = useNavigate()
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
-  const pageItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize))
+  const pageItems = items.slice((page - 1) * pageSize, page * pageSize)
 
   if (items.length === 0) {
     return <p className="px-1 py-6 text-sm text-muted-foreground">Không tìm thấy defect nào.</p>
@@ -50,7 +51,7 @@ export function DefectList({ items, page, onPageChange }: DefectListProps) {
           </div>
         </Card>
       ))}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between pt-2 print:hidden">
         <p className="text-sm text-muted-foreground">Trang {page} / {totalPages}</p>
         <div className="flex items-center gap-1">
           <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))}>

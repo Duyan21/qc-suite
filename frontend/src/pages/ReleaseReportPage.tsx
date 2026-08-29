@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Download } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCurrentProject } from '@/lib/currentProject'
+import { formatDate } from '@/lib/utils'
 import { listReleases, getBurndown, type Release, type BurndownPoint } from '@/lib/releases'
 import {
   listDefects,
@@ -44,8 +47,20 @@ export function ReleaseReportPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isPrinting, setIsPrinting] = useState(false)
   const requestIdRef = useRef(0)
   const releasesRequestIdRef = useRef(0)
+
+  useEffect(() => {
+    const handleBeforePrint = () => setIsPrinting(true)
+    const handleAfterPrint = () => setIsPrinting(false)
+    window.addEventListener('beforeprint', handleBeforePrint)
+    window.addEventListener('afterprint', handleAfterPrint)
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint)
+      window.removeEventListener('afterprint', handleAfterPrint)
+    }
+  }, [])
 
   useEffect(() => {
     if (!project) {
@@ -159,21 +174,38 @@ export function ReleaseReportPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 print:hidden sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-heading text-xl font-semibold">Release Report</h1>
-        <Select value={selectedId ? String(selectedId) : undefined} onValueChange={(value) => setSelectedId(Number(value))}>
-          <SelectTrigger className="w-full sm:w-64">
-            <SelectValue placeholder="Chọn release" />
-          </SelectTrigger>
-          <SelectContent>
-            {(releases ?? []).map((r) => (
-              <SelectItem key={r.id} value={String(r.id)}>
-                {r.version_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Select value={selectedId ? String(selectedId) : undefined} onValueChange={(value) => setSelectedId(Number(value))}>
+            <SelectTrigger className="w-full sm:w-64">
+              <SelectValue placeholder="Chọn release" />
+            </SelectTrigger>
+            <SelectContent>
+              {(releases ?? []).map((r) => (
+                <SelectItem key={r.id} value={String(r.id)}>
+                  {r.version_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button type="button" variant="outline" disabled={!selectedRelease} onClick={() => window.print()}>
+            <Download />
+            Xuất báo cáo (PDF)
+          </Button>
+        </div>
       </div>
+
+      {selectedRelease && (
+        <div className="hidden print:block">
+          <h1 className="text-2xl font-bold">Release Report</h1>
+          <p className="text-sm text-muted-foreground">
+            {project.name} · {selectedRelease.version_name}
+          </p>
+          <p className="text-sm text-muted-foreground">Ngày xuất: {formatDate(new Date().toISOString())}</p>
+          <div className="my-3 border-b" />
+        </div>
+      )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
       {loading && <p className="text-sm text-muted-foreground">Đang tải...</p>}
@@ -221,7 +253,12 @@ export function ReleaseReportPage() {
 
           <Card className="p-4">
             <h2 className="mb-2 text-sm font-medium">Danh sách Defects</h2>
-            <DefectList items={filteredDefects} page={page} onPageChange={setPage} />
+            <DefectList
+              items={filteredDefects}
+              page={page}
+              onPageChange={setPage}
+              pageSize={isPrinting ? Math.max(filteredDefects.length, 1) : undefined}
+            />
           </Card>
 
           <Card className="p-4">
@@ -236,6 +273,10 @@ export function ReleaseReportPage() {
               }
             />
           </Card>
+
+          <div className="hidden pt-2 text-center text-xs text-muted-foreground print:block">
+            Được tạo bởi QMS · {formatDate(new Date().toISOString())}
+          </div>
         </>
       )}
     </div>
