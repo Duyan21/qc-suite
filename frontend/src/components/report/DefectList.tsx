@@ -41,6 +41,9 @@ export function DefectList({ items, page, onPageChange }: DefectListProps) {
             <p className="truncate font-medium">{d.title}</p>
             <p className="text-xs text-muted-foreground">{d.assignee_name ?? 'Chưa gán'}</p>
           </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-muted-foreground">{d.description ?? ''}</p>
+          </div>
           <div className="flex shrink-0 items-center gap-2">
             <Badge className={DEFECT_SEVERITY_BADGE_CLASS[d.severity ?? ''] ?? ''}>{d.severity ?? '—'}</Badge>
             <Badge className={DEFECT_STATUS_BADGE_CLASS[d.status] ?? ''}>{d.status}</Badge>
