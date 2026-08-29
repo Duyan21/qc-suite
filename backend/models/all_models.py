@@ -151,6 +151,8 @@ class Defect(Base):
     requirement_id = Column(Integer, ForeignKey("requirements.id"), nullable=True)
     found_in_version = Column(String(50))
     fixed_in_version = Column(String(50))
+    release_id = Column(Integer, ForeignKey("releases.id", ondelete="SET NULL"), nullable=True)
+    assignee_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 

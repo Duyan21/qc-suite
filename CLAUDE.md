@@ -56,7 +56,7 @@ Invalidated when requirement gets a new version.
 | releases | Release versions for Release Report; also carries `status` (New/InProgress/Completed, derived from member results), `target_date`, `owner_user_id` |
 | requirements | Versioned (req_id, version, is_current, previous_version_id) |
 | test_cases | Has embedding VECTOR(768), FK → requirements.id |
-| defects | FK to test_cases and requirements (both optional) |
+| defects | FK to test_cases and requirements (both optional), plus `release_id` and `assignee_user_id` (both optional) |
 | release_test_cases | Membership: "this test case is part of this release", with cached `current_result` (NotRun/Pass/Fail) mirroring the latest execution |
 | release_test_case_executions | One row per execution *attempt* (result Pass/Fail, note, executed_by, executed_at) — history is kept, never overwritten |
 | execution_evidence_images | Screenshot evidence per execution; `file_path` is relative to the uploads dir |
@@ -122,14 +122,16 @@ detail-page targets linked from elsewhere (the Traceability matrix's `req_id` ce
 Test Runs list's release rows), not sidebar items.
 
 Wired-to-real-backend: Auth (Sprint 0/1), Traceability (Sprint 1 — `GET /traceability`,
-plus the project switcher, see below), and Test Runs (`/testruns` list + `/testruns/:id`
+plus the project switcher, see below), Test Runs (`/testruns` list + `/testruns/:id`
 release detail — release CRUD, add/remove test cases, record executions with screenshot
 evidence, execution history; see `frontend/src/lib/releases.ts` and `backend/routers/
-releases.py`). Built with real UI but still mock data, not yet backend-integrated: Admin.
+releases.py`), and Release Report (`/report` — pass rate, execution status, burn-down
+chart, and defect breakdown by severity/status for a selected release; see
+`frontend/src/pages/ReleaseReportPage.tsx`). Built with real UI but still mock data, not
+yet backend-integrated: Admin.
 Bare placeholder pages (Card + title only): Dashboard, Requirements, Test Cases, Defects,
-Semantic Search, Impact Agent, Release Report, and the `/requirements/:id` detail stub
-(deliberately bare — real content lands whenever `RequirementsPage` itself gets built for
-real, not before).
+Semantic Search, Impact Agent, and the `/requirements/:id` detail stub (deliberately bare
+— real content lands whenever `RequirementsPage` itself gets built for real, not before).
 
 ### API Integration Pattern (established by the auth wiring)
 `frontend/src/lib/api.ts` is the shared fetch wrapper every backend integration should go

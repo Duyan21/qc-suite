@@ -1,6 +1,8 @@
+from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.all_models import (
@@ -17,6 +19,7 @@ from models.base import get_db
 from schemas.common import RequirementSummary
 from schemas.releases import (
     AddTestCasesRequest,
+    BurndownPoint,
     EvidenceImageItem,
     ExecutionHistoryItem,
     ReleaseCreate,
@@ -124,6 +127,42 @@ def get_release(release_id: int, db: Session = Depends(get_db), current_user: Us
         raise HTTPException(status_code=404, detail="Release not found")
     check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.READ)
     return _release_response(db, release)
+
+
+@router.get("/{release_id}/burndown", response_model=list[BurndownPoint])
+def get_release_burndown(release_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    release = db.get(Release, release_id)
+    if release is None:
+        raise HTTPException(status_code=404, detail="Release not found")
+    check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.READ)
+
+    rtc_ids = [
+        rtc_id for (rtc_id,) in db.query(ReleaseTestCase.id).filter(ReleaseTestCase.release_id == release_id).all()
+    ]
+    total = len(rtc_ids)
+    if total == 0:
+        return []
+
+    rows = (
+        db.query(ReleaseTestCaseExecution.release_test_case_id, func.min(ReleaseTestCaseExecution.executed_at))
+        .filter(ReleaseTestCaseExecution.release_test_case_id.in_(rtc_ids))
+        .group_by(ReleaseTestCaseExecution.release_test_case_id)
+        .all()
+    )
+    first_execution_dates = [executed_at.date() for _, executed_at in rows]
+
+    start = release.created_at.date()
+    end = max(date.today(), release.target_date or date.today())
+    if end < start:
+        end = start
+
+    points: list[BurndownPoint] = []
+    current = start
+    while current <= end:
+        executed_by_day = sum(1 for d in first_execution_dates if d <= current)
+        points.append(BurndownPoint(date=current, remaining=total - executed_by_day))
+        current += timedelta(days=1)
+    return points
 
 
 @router.patch("/{release_id}/status", response_model=ReleaseResponse)

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { updateDefect, type Defect, type DefectDetail, type DefectSeverity, type DefectStatus } from '@/lib/defects'
+import { listMembers, type Member } from '@/lib/members'
 import { useToast } from '@/lib/toast'
+
+const NONE_VALUE = '__none__'
 
 type EditDefectDialogProps = {
   open: boolean
@@ -30,6 +33,12 @@ type EditDefectDialogProps = {
 export function EditDefectDialog({ open, onOpenChange, defect, onUpdated }: EditDefectDialogProps) {
   const toast = useToast()
   const [submitting, setSubmitting] = useState(false)
+  const [members, setMembers] = useState<Member[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    listMembers(defect.project_id).then(setMembers).catch(() => setMembers([]))
+  }, [open, defect.project_id])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -38,6 +47,7 @@ export function EditDefectDialog({ open, onOpenChange, defect, onUpdated }: Edit
     const severity = String(data.get('severity') ?? defect.severity ?? 'Medium') as DefectSeverity
     const status = String(data.get('status') ?? defect.status) as DefectStatus
     const fixedInVersion = String(data.get('fixed_in_version') ?? '').trim()
+    const assigneeIdRaw = String(data.get('assignee_user_id') ?? NONE_VALUE)
 
     setSubmitting(true)
     try {
@@ -45,6 +55,7 @@ export function EditDefectDialog({ open, onOpenChange, defect, onUpdated }: Edit
         severity,
         status,
         fixed_in_version: fixedInVersion || undefined,
+        assignee_user_id: assigneeIdRaw === NONE_VALUE ? undefined : Number(assigneeIdRaw),
       })
       onOpenChange(false)
       onUpdated(updated)
@@ -100,6 +111,23 @@ export function EditDefectDialog({ open, onOpenChange, defect, onUpdated }: Edit
                 defaultValue={defect.fixed_in_version ?? ''}
                 placeholder="v2.1.0"
               />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-defect-assignee">Assignee</Label>
+              <Select
+                name="assignee_user_id"
+                defaultValue={defect.assignee_user_id ? String(defect.assignee_user_id) : NONE_VALUE}
+              >
+                <SelectTrigger id="edit-defect-assignee" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_VALUE}>— Không gán —</SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.user_id} value={String(m.user_id)}>{m.full_name ?? m.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

@@ -20,3 +20,12 @@ class TestCaseSummary(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ReleaseSummary(BaseModel):
+    id: int
+    version_name: str
+    status: str
+
+    class Config:
+        from_attributes = True

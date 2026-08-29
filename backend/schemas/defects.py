@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from schemas.common import RequirementSummary, TestCaseSummary
+from schemas.common import ReleaseSummary, RequirementSummary, TestCaseSummary
 
 DefectSeverity = Literal["Critical", "High", "Medium", "Low"]
 DefectStatus = Literal["Open", "Fixed", "Closed", "Wont-Fix"]
@@ -16,6 +16,8 @@ class DefectCreate(BaseModel):
     status: DefectStatus = "Open"
     testcase_id: int | None = None
     requirement_id: int | None = None
+    release_id: int | None = None
+    assignee_user_id: int | None = None
     project_id: int
 
 
@@ -23,6 +25,7 @@ class DefectUpdate(BaseModel):
     severity: DefectSeverity
     status: DefectStatus
     fixed_in_version: str | None = None
+    assignee_user_id: int | None = None
 
 
 class DefectResponse(BaseModel):
@@ -34,6 +37,8 @@ class DefectResponse(BaseModel):
     status: str
     testcase_id: int | None
     requirement_id: int | None
+    release_id: int | None
+    assignee_user_id: int | None
     found_in_version: str | None
     fixed_in_version: str | None
     project_id: int
@@ -46,10 +51,13 @@ class DefectResponse(BaseModel):
 class DefectDetailResponse(DefectResponse):
     test_case: TestCaseSummary | None = None
     requirement: RequirementSummary | None = None
+    release: ReleaseSummary | None = None
+    assignee_name: str | None = None
 
 
 class DefectListItem(DefectResponse):
     test_case: TestCaseSummary | None = None
+    assignee_name: str | None = None
 
 
 class DefectListResponse(BaseModel):

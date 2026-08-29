@@ -9,6 +9,7 @@ import { useCurrentProject } from '@/lib/currentProject'
 import { formatDate } from '@/lib/utils'
 import {
   listDefects,
+  compareDefectsBySeverity,
   DEFECT_SEVERITY_BADGE_CLASS,
   DEFECT_STATUS_BADGE_CLASS,
   type DefectListItem,
@@ -22,13 +23,6 @@ const PAGE_SIZE = 20
 const FETCH_LIMIT = 200
 const SEVERITY_OPTIONS: DefectSeverity[] = ['Critical', 'High', 'Medium', 'Low']
 const STATUS_OPTIONS: DefectStatus[] = ['Open', 'Fixed', 'Closed', 'Wont-Fix']
-
-const SEVERITY_RANK: Record<DefectSeverity, number> = {
-  Critical: 3,
-  High: 2,
-  Medium: 1,
-  Low: 0,
-}
 
 const SEVERITY_DOT_CLASS: Record<DefectSeverity, string> = {
   Critical: 'bg-red-500',
@@ -52,13 +46,6 @@ function matchesDefectFilters(
   }
   if (status !== 'all' && d.status !== status) return false
   return true
-}
-
-function compareDefects(a: DefectListItem, b: DefectListItem): number {
-  const rankA = a.severity ? SEVERITY_RANK[a.severity as DefectSeverity] ?? -1 : -1
-  const rankB = b.severity ? SEVERITY_RANK[b.severity as DefectSeverity] ?? -1 : -1
-  if (rankA !== rankB) return rankB - rankA
-  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 }
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -126,7 +113,7 @@ export function DefectsPage() {
           status: selectedStatus,
         }),
       )
-      .sort(compareDefects)
+      .sort(compareDefectsBySeverity)
   }, [allDefects, debouncedSearch, selectedSeverities, selectedStatus])
 
   const totalPages = Math.max(1, Math.ceil(filteredSorted.length / PAGE_SIZE))

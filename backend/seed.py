@@ -11,7 +11,7 @@ Run from backend/ with the venv active and the DB up:
 import json
 import os
 import random
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from models.all_models import (
     Defect,
@@ -117,6 +117,7 @@ def seed_users(db, project):
 
 def seed_releases(db, project, admin_user):
     today = date.today()
+    now = datetime.utcnow()
     releases = [
         Release(
             project_id=project.id,
@@ -124,6 +125,7 @@ def seed_releases(db, project, admin_user):
             note="SIT build, first full regression pass.",
             target_date=today + timedelta(days=14),
             owner_user_id=admin_user.id,
+            created_at=now - timedelta(days=14),
         ),
         Release(
             project_id=project.id,
@@ -131,6 +133,7 @@ def seed_releases(db, project, admin_user):
             note="UAT candidate, includes AML and income-policy fixes.",
             target_date=today + timedelta(days=30),
             owner_user_id=admin_user.id,
+            created_at=now - timedelta(days=7),
         ),
         Release(
             project_id=project.id,
@@ -230,10 +233,11 @@ def seed_test_cases(db, requirements, tc_data):
     return test_cases
 
 
-def seed_defects(db, project, test_cases, requirements, defect_data, releases):
+def seed_defects(db, project, test_cases, requirements, defect_data, releases, users):
+    found_in = next(r for r in releases if r.version_name == "v1.0.0-SIT")
     fixed_in = next(r for r in releases if r.version_name == "v1.1.0-UAT").version_name
     defects = {}
-    for row in defect_data:
+    for i, row in enumerate(defect_data):
         description = (
             f"Steps to Reproduce: {row['steps_to_reproduce']}\n"
             f"Expected: {row['expected_result']}\n"
@@ -250,6 +254,8 @@ def seed_defects(db, project, test_cases, requirements, defect_data, releases):
             status=LEGACY_TO_CANONICAL_DEFECT_STATUS.get(row["status"], row["status"]),
             testcase_id=test_cases[row["tc_id"]].id if row["tc_id"] else None,
             requirement_id=requirements[row["req_id"]].id if row["req_id"] else None,
+            release_id=found_in.id,
+            assignee_user_id=users[i % len(users)].id,
             found_in_version=row["environment"],
             fixed_in_version=fixed_in if row["status"] in CLOSED_DEFECT_STATUSES else None,
             project_id=project.id,
@@ -261,11 +267,18 @@ def seed_defects(db, project, test_cases, requirements, defect_data, releases):
     return defects
 
 
+def _stagger_executed_at(release_created_at, today):
+    span_days = max((today - release_created_at.date()).days, 1)
+    offset_days = random.randint(0, span_days)
+    return release_created_at + timedelta(days=offset_days)
+
+
 def seed_release_test_cases(db, releases, test_cases, defect_data, executed_by):
     """SIT run covers full regression; UAT run covers a targeted subset.
     Results for defect-linked test cases are consistent with defect status
     instead of random, so traceability data tells a coherent story.
     """
+    today = date.today()
     defect_by_tc = {row["tc_id"]: row for row in defect_data if row["tc_id"]}
 
     sit_release = next(r for r in releases if r.version_name == "v1.0.0-SIT")
@@ -288,6 +301,7 @@ def seed_release_test_cases(db, releases, test_cases, defect_data, executed_by):
                 result=result,
                 note="SIT full regression run.",
                 executed_by=executed_by,
+                executed_at=_stagger_executed_at(sit_release.created_at, today),
             )
         )
 
@@ -311,6 +325,7 @@ def seed_release_test_cases(db, releases, test_cases, defect_data, executed_by):
                 result=result,
                 note="UAT targeted regression run.",
                 executed_by=executed_by,
+                executed_at=_stagger_executed_at(uat_release.created_at, today),
             )
         )
 
@@ -339,7 +354,7 @@ def main():
         modules = seed_modules(db, project, req_data)
         requirements = seed_requirements(db, project, req_data, modules)
         test_cases = seed_test_cases(db, requirements, tc_data)
-        defects = seed_defects(db, project, test_cases, requirements, defect_data, releases)
+        defects = seed_defects(db, project, test_cases, requirements, defect_data, releases, users)
         results = seed_release_test_cases(db, releases, test_cases, defect_data, admin_user.id)
 
         # seed_release_test_cases has already flushed its ReleaseTestCase rows,

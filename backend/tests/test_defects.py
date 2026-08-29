@@ -1,7 +1,7 @@
 import re
 import uuid
 
-from models.all_models import Project, Requirement, TestCase
+from models.all_models import Defect, Project, Release, Requirement, TestCase, User
 from services.code_generator import next_code
 
 
@@ -444,3 +444,275 @@ def test_delete_defect_succeeds_with_full(client, db_session, member_user, proje
 
     response = client.delete(f"/defects/{created['id']}", headers=headers)
     assert response.status_code == 204
+
+
+def test_defect_release_and_assignee_columns_round_trip(db_session, project):
+    from datetime import date
+
+    release = Release(project_id=project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    user = User(email="assignee@example.com", hashed_password="x", full_name="Assignee")
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    defect = Defect(
+        code="DEF-RT-1",
+        title="Round trip",
+        severity="Low",
+        status="Open",
+        project_id=project.id,
+        release_id=release.id,
+        assignee_user_id=user.id,
+    )
+    db_session.add(defect)
+    db_session.commit()
+    db_session.refresh(defect)
+
+    assert defect.release_id == release.id
+    assert defect.assignee_user_id == user.id
+
+
+def test_create_defect_accepts_release_id_in_same_project(client, auth_headers, db_session, project):
+    from datetime import date
+
+    release = Release(project_id=project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    response = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id, "release_id": release.id},
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["release_id"] == release.id
+
+
+def test_create_defect_rejects_release_id_from_other_project(client, auth_headers, db_session, project):
+    from datetime import date
+
+    other_project = Project(name="Other", description="d", key="OTH1")
+    db_session.add(other_project)
+    db_session.commit()
+    db_session.refresh(other_project)
+
+    release = Release(project_id=other_project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    response = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id, "release_id": release.id},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
+def test_create_defect_rejects_unknown_release_id(client, auth_headers, project):
+    response = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id, "release_id": 999999},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
+def test_create_defect_rejects_assignee_not_a_project_member(client, auth_headers, project, member_user):
+    response = client.post(
+        "/defects",
+        json={
+            "title": "Bug", "severity": "Low", "status": "Open",
+            "project_id": project.id, "assignee_user_id": member_user.id,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
+
+
+def test_create_defect_accepts_assignee_who_is_a_project_member(client, auth_headers, db_session, project, member_user):
+    from conftest import make_project_member
+
+    make_project_member(db_session, project, member_user, "tester")
+    response = client.post(
+        "/defects",
+        json={
+            "title": "Bug", "severity": "Low", "status": "Open",
+            "project_id": project.id, "assignee_user_id": member_user.id,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["assignee_user_id"] == member_user.id
+
+
+def test_update_defect_sets_and_clears_assignee(client, auth_headers, db_session, project, member_user):
+    from conftest import make_project_member
+
+    make_project_member(db_session, project, member_user, "tester")
+    create_resp = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    )
+    defect_id = create_resp.json()["id"]
+
+    set_resp = client.put(
+        f"/defects/{defect_id}",
+        json={"severity": "Low", "status": "Open", "assignee_user_id": member_user.id},
+        headers=auth_headers,
+    )
+    assert set_resp.status_code == 200
+    assert set_resp.json()["assignee_user_id"] == member_user.id
+
+    clear_resp = client.put(
+        f"/defects/{defect_id}",
+        json={"severity": "Low", "status": "Open"},
+        headers=auth_headers,
+    )
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["assignee_user_id"] is None
+
+
+def test_list_defects_resolves_assignee_name(client, auth_headers, test_user, project):
+    client.post(
+        "/defects",
+        json={
+            "title": "Bug", "severity": "Low", "status": "Open",
+            "project_id": project.id, "assignee_user_id": test_user.id,
+        },
+        headers=auth_headers,
+    )
+    response = client.get(f"/defects?project_id={project.id}", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json()["items"][0]["assignee_name"] == test_user.full_name
+
+
+def test_get_defect_detail_resolves_assignee_name_and_release(client, auth_headers, db_session, test_user, project):
+    from datetime import date
+
+    release = Release(project_id=project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    create_resp = client.post(
+        "/defects",
+        json={
+            "title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id,
+            "assignee_user_id": test_user.id, "release_id": release.id,
+        },
+        headers=auth_headers,
+    )
+    defect_id = create_resp.json()["id"]
+    response = client.get(f"/defects/{defect_id}", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["assignee_name"] == test_user.full_name
+    assert data["release"]["id"] == release.id
+    assert data["release"]["version_name"] == "v1.0.0"
+
+
+def test_list_defects_filters_by_release_id(client, auth_headers, db_session, project):
+    from datetime import date
+
+    release_a = Release(project_id=project.id, version_name="vA", target_date=date.today())
+    release_b = Release(project_id=project.id, version_name="vB", target_date=date.today())
+    db_session.add_all([release_a, release_b])
+    db_session.commit()
+    db_session.refresh(release_a)
+    db_session.refresh(release_b)
+
+    client.post(
+        "/defects",
+        json={"title": "In A", "severity": "Low", "status": "Open", "project_id": project.id, "release_id": release_a.id},
+        headers=auth_headers,
+    )
+    client.post(
+        "/defects",
+        json={"title": "In B", "severity": "Low", "status": "Open", "project_id": project.id, "release_id": release_b.id},
+        headers=auth_headers,
+    )
+    client.post(
+        "/defects",
+        json={"title": "No release", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    )
+
+    response = client.get(f"/defects?project_id={project.id}&release_id={release_a.id}", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["title"] == "In A"
+
+
+def test_list_defects_rejects_unknown_release_id(client, auth_headers, project):
+    response = client.get(f"/defects?project_id={project.id}&release_id=999999", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_list_defects_rejects_release_id_from_different_project(client, auth_headers, db_session, project):
+    from datetime import date
+
+    other_project = Project(name="Other", description="d", key="OTH2")
+    db_session.add(other_project)
+    db_session.commit()
+    db_session.refresh(other_project)
+
+    release = Release(project_id=other_project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    response = client.get(f"/defects?project_id={project.id}&release_id={release.id}", headers=auth_headers)
+    assert response.status_code == 400
+
+
+def test_list_defects_rejects_release_id_from_different_project_before_leaking_existence_to_unauthorized_caller(client, member_auth_headers, db_session, project):
+    from datetime import date
+
+    other_project = Project(name="Other", description="d", key="OTH3")
+    db_session.add(other_project)
+    db_session.commit()
+    db_session.refresh(other_project)
+
+    release = Release(project_id=other_project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    # member_user (behind member_auth_headers) has no membership on `project` either.
+    response = client.get(f"/defects?project_id={project.id}&release_id={release.id}", headers=member_auth_headers)
+    assert response.status_code == 403
+
+
+def test_list_defects_by_release_id_alone_checks_permission_on_releases_project(client, member_auth_headers, db_session, project):
+    from datetime import date
+
+    release = Release(project_id=project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    # member_user (behind member_auth_headers) has no membership on `project`.
+    response = client.get(f"/defects?release_id={release.id}", headers=member_auth_headers)
+    assert response.status_code == 403
+
+
+def test_list_defects_by_release_id_alone_succeeds_for_a_member(client, db_session, project, member_user, member_auth_headers):
+    from conftest import make_project_member
+    from datetime import date
+
+    make_project_member(db_session, project, member_user, "tester")
+    release = Release(project_id=project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    response = client.get(f"/defects?release_id={release.id}", headers=member_auth_headers)
+    assert response.status_code == 200
