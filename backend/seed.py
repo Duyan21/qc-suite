@@ -9,9 +9,13 @@ Run from backend/ with the venv active and the DB up:
     python seed.py
 """
 import json
+import logging
 import os
 import random
+import time
 from datetime import date, datetime, timedelta
+
+from google.api_core.exceptions import ResourceExhausted
 
 from models.all_models import (
     Defect,
@@ -28,7 +32,10 @@ from models.all_models import (
 )
 from models.base import SessionLocal
 from services.auth_service import hash_password
+from services.embedding_service import build_test_case_text, embed
 from services.release_status import recompute_release_status
+
+logger = logging.getLogger(__name__)
 
 PROJECT_NAME = "Home Lending System"
 
@@ -211,8 +218,31 @@ def seed_requirements(db, project, req_data, modules):
     return requirements
 
 
+def _embed_with_retry(text, task_type, max_attempts=6, retry_seconds=65):
+    """The Gemini free tier allows only 100 embed_content calls/minute, well
+    under the ~300 test cases seeded here — so plain embed() reliably hits
+    429 ResourceExhausted partway through a fresh seed. Retry with a fixed
+    backoff instead of giving up, since a transient quota window is not a
+    real failure.
+    """
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return embed(text, task_type=task_type)
+        except ResourceExhausted:
+            if attempt == max_attempts:
+                raise
+            time.sleep(retry_seconds)
+
+
 def seed_test_cases(db, requirements, tc_data):
+    """Embeds each test case at seed time so semantic search works on a
+    freshly-seeded DB without a separate backfill step — mirroring the
+    embed_and_store background task that runs on the real create/update
+    endpoints (routers/test_cases.py), which seeding bypasses entirely since
+    rows are inserted directly rather than through the API.
+    """
     test_cases = {}
+    embedded_count = 0
     for row in tc_data:
         req = requirements[row["req_id"]]
         preconditions = f"{row['preconditions']} Test data: {row['test_data']}."
@@ -226,10 +256,16 @@ def seed_test_cases(db, requirements, tc_data):
             status="Active",
             requirement_id=req.id,
         )
+        try:
+            tc.embedding = _embed_with_retry(build_test_case_text(tc), task_type="RETRIEVAL_DOCUMENT")
+            embedded_count += 1
+        except Exception:
+            logger.exception("Failed to embed seeded test case %s", row["tc_id"])
         db.add(tc)
         test_cases[row["tc_id"]] = tc
 
     db.flush()
+    print(f"Embedded {embedded_count}/{len(tc_data)} seeded test cases.")
     return test_cases
 
 
