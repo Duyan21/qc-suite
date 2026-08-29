@@ -169,7 +169,12 @@ def get_release_burndown(release_id: int, db: Session = Depends(get_db), current
         executed_by_day = sum(1 for d in first_execution_dates if d <= current)
         if target_date is not None and expected_span_days is not None:
             days_remaining = max((target_date - current).days, 0)
-            expected = round(total * days_remaining / expected_span_days)
+            # Left un-rounded on purpose: this is a continuous reference
+            # trend, not a real discrete count like `remaining` — rounding
+            # to the nearest integer plateaus for 1-2+ days whenever
+            # total < expected_span_days (fewer test cases than days in the
+            # release window), which is the common case.
+            expected = total * days_remaining / expected_span_days
         else:
             expected = None
         points.append(BurndownPoint(date=current, remaining=total - executed_by_day, expected=expected))

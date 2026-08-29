@@ -84,4 +84,4 @@ class ExecutionHistoryItem(BaseModel):
 class BurndownPoint(BaseModel):
     date: date
     remaining: int
-    expected: int | None
+    expected: float | None

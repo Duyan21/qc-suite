@@ -13,7 +13,10 @@ export function BurndownChart({ points }: { points: BurndownPoint[] }) {
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="date" tickFormatter={(d: string) => formatDate(d)} tick={{ fontSize: 12 }} />
         <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-        <Tooltip labelFormatter={(d) => formatDate(d as string)} />
+        <Tooltip
+          labelFormatter={(d) => formatDate(d as string)}
+          formatter={(value) => (typeof value === 'number' && !Number.isInteger(value) ? Number(value.toFixed(1)) : value)}
+        />
         <Legend />
         <Line type="monotone" dataKey="remaining" name="Thực tế" stroke="#3b82f6" strokeWidth={2} dot={false} />
         <Line
