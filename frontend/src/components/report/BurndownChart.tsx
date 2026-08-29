@@ -13,7 +13,7 @@ export function BurndownChart({ points }: { points: BurndownPoint[] }) {
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="date" tickFormatter={(d: string) => formatDate(d)} tick={{ fontSize: 12 }} />
         <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-        <Tooltip labelFormatter={(d: string) => formatDate(d)} />
+        <Tooltip labelFormatter={(d) => formatDate(d as string)} />
         <Line type="monotone" dataKey="remaining" stroke="#3b82f6" strokeWidth={2} dot={false} />
       </LineChart>
     </ResponsiveContainer>
