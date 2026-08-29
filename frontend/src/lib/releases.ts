@@ -53,6 +53,12 @@ export type ExecutionHistoryItem = {
   images: EvidenceImageItem[]
 }
 
+export type BurndownPoint = {
+  date: string
+  remaining: number
+  expected: number | null
+}
+
 export const RELEASE_STATUS_BADGE_CLASS: Record<string, string> = {
   New: 'bg-muted text-muted-foreground',
   InProgress: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
@@ -173,6 +179,14 @@ export async function executeTestCase(
 export async function getExecutionHistory(releaseId: number, testcaseId: number): Promise<ExecutionHistoryItem[]> {
   try {
     return await authFetch<ExecutionHistoryItem[]>(`/releases/${releaseId}/test-cases/${testcaseId}/executions`)
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
+}
+
+export async function getBurndown(releaseId: number): Promise<BurndownPoint[]> {
+  try {
+    return await authFetch<BurndownPoint[]>(`/releases/${releaseId}/burndown`)
   } catch (err) {
     throw toVietnameseError(err)
   }

@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from models.all_models import Defect, Project, Requirement, TestCase, User
+from models.all_models import Defect, Project, Release, Requirement, TestCase, User
 from models.base import get_db
-from schemas.common import RequirementSummary, TestCaseSummary
+from schemas.common import ReleaseSummary, RequirementSummary, TestCaseSummary
 from schemas.defects import (
     DefectCreate,
     DefectDetailResponse,
@@ -16,7 +16,13 @@ from schemas.defects import (
 )
 from services.auth_service import get_current_user
 from services.code_generator import next_code
-from services.permissions import PermissionArea, PermissionLevel, check_permission, permitted_project_ids
+from services.permissions import (
+    PermissionArea,
+    PermissionLevel,
+    check_permission,
+    is_project_member,
+    permitted_project_ids,
+)
 
 router = APIRouter(
     prefix="/defects",
@@ -25,9 +31,16 @@ router = APIRouter(
 )
 
 
+def _display_name(user: User | None) -> str | None:
+    if user is None:
+        return None
+    return user.full_name or user.email
+
+
 @router.get("", response_model=DefectListResponse)
 def list_defects(
     project_id: int | None = None,
+    release_id: int | None = None,
     severity: str | None = None,
     status_filter: str | None = Query(None, alias="status"),
     requirement_id: int | None = None,
@@ -41,14 +54,34 @@ def list_defects(
     if project_id is not None and db.get(Project, project_id) is None:
         raise HTTPException(status_code=404, detail="project_id not found")
 
-    query = db.query(Defect)
+    # Check permission on an explicitly-given project_id BEFORE resolving or
+    # validating release_id, so an unauthorized caller never learns whether a
+    # release_id exists or which project it belongs to.
     if project_id is not None:
         check_permission(db, current_user, project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
-        query = query.filter(Defect.project_id == project_id)
+
+    release = None
+    if release_id is not None:
+        release = db.get(Release, release_id)
+        if release is None:
+            raise HTTPException(status_code=404, detail="release_id not found")
+        if project_id is not None and release.project_id != project_id:
+            raise HTTPException(status_code=400, detail="release_id does not belong to project_id")
+
+    query = db.query(Defect)
+    effective_project_id = project_id if project_id is not None else (release.project_id if release else None)
+    if effective_project_id is not None:
+        if project_id is None:
+            # release_id-alone path: project wasn't known above, so permission
+            # couldn't be checked until the release was resolved.
+            check_permission(db, current_user, effective_project_id, PermissionArea.DEFECTS, PermissionLevel.READ)
+        query = query.filter(Defect.project_id == effective_project_id)
     else:
         allowed_ids = permitted_project_ids(db, current_user, PermissionArea.DEFECTS, PermissionLevel.READ)
         if allowed_ids is not None:
             query = query.filter(Defect.project_id.in_(allowed_ids))
+    if release_id is not None:
+        query = query.filter(Defect.release_id == release_id)
     if severity is not None:
         query = query.filter(Defect.severity == severity)
     if status_filter is not None:
@@ -76,11 +109,18 @@ def list_defects(
         for tc in db.query(TestCase).filter(TestCase.id.in_(testcase_ids)).all():
             test_cases_by_id[tc.id] = tc
 
+    assignee_ids = {d.assignee_user_id for d in items if d.assignee_user_id is not None}
+    assignees_by_id = {}
+    if assignee_ids:
+        for u in db.query(User).filter(User.id.in_(assignee_ids)).all():
+            assignees_by_id[u.id] = u
+
     list_items = []
     for d in items:
         list_item = DefectListItem.model_validate(d)
         tc = test_cases_by_id.get(d.testcase_id)
         list_item.test_case = TestCaseSummary.model_validate(tc) if tc else None
+        list_item.assignee_name = _display_name(assignees_by_id.get(d.assignee_user_id))
         list_items.append(list_item)
 
     return DefectListResponse(items=list_items, total=total, page=page, limit=limit)
@@ -95,6 +135,14 @@ def create_defect(payload: DefectCreate, db: Session = Depends(get_db), current_
         raise HTTPException(status_code=400, detail="testcase_id not found")
     if payload.requirement_id is not None and db.get(Requirement, payload.requirement_id) is None:
         raise HTTPException(status_code=400, detail="requirement_id not found")
+    if payload.release_id is not None:
+        release = db.get(Release, payload.release_id)
+        if release is None or release.project_id != payload.project_id:
+            raise HTTPException(status_code=400, detail="release_id not found in this project")
+    if payload.assignee_user_id is not None:
+        assignee = db.get(User, payload.assignee_user_id)
+        if assignee is None or not is_project_member(db, assignee, payload.project_id):
+            raise HTTPException(status_code=400, detail="assignee_user_id is not a member of this project")
 
     code = next_code(db, Defect, "code", "DEF")
     defect = Defect(
@@ -105,6 +153,8 @@ def create_defect(payload: DefectCreate, db: Session = Depends(get_db), current_
         status=payload.status,
         testcase_id=payload.testcase_id,
         requirement_id=payload.requirement_id,
+        release_id=payload.release_id,
+        assignee_user_id=payload.assignee_user_id,
         project_id=payload.project_id,
     )
     db.add(defect)
@@ -149,12 +199,16 @@ def get_defect(id: int, db: Session = Depends(get_db), current_user: User = Depe
 
     test_case = db.get(TestCase, defect.testcase_id) if defect.testcase_id else None
     requirement = db.get(Requirement, defect.requirement_id) if defect.requirement_id else None
+    release = db.get(Release, defect.release_id) if defect.release_id else None
+    assignee = db.get(User, defect.assignee_user_id) if defect.assignee_user_id else None
 
     response = DefectDetailResponse.model_validate(defect)
     response.test_case = TestCaseSummary.model_validate(test_case) if test_case else None
     response.requirement = (
         RequirementSummary.model_validate(requirement) if requirement else None
     )
+    response.release = ReleaseSummary.model_validate(release) if release else None
+    response.assignee_name = _display_name(assignee)
     return response
 
 
@@ -164,10 +218,20 @@ def update_defect(id: int, payload: DefectUpdate, db: Session = Depends(get_db),
     if defect is None:
         raise HTTPException(status_code=404, detail="Defect not found")
     check_permission(db, current_user, defect.project_id, PermissionArea.DEFECTS, PermissionLevel.EDIT)
+    if payload.release_id is not None:
+        release = db.get(Release, payload.release_id)
+        if release is None or release.project_id != defect.project_id:
+            raise HTTPException(status_code=400, detail="release_id not found in this project")
+    if payload.assignee_user_id is not None:
+        assignee = db.get(User, payload.assignee_user_id)
+        if assignee is None or not is_project_member(db, assignee, defect.project_id):
+            raise HTTPException(status_code=400, detail="assignee_user_id is not a member of this project")
 
     defect.severity = payload.severity
     defect.status = payload.status
     defect.fixed_in_version = payload.fixed_in_version
+    defect.release_id = payload.release_id
+    defect.assignee_user_id = payload.assignee_user_id
     db.commit()
     db.refresh(defect)
     return defect

@@ -5,6 +5,12 @@ import type { TestCaseSummary } from './testCases'
 export type DefectSeverity = 'Critical' | 'High' | 'Medium' | 'Low'
 export type DefectStatus = 'Open' | 'Fixed' | 'Closed' | 'Wont-Fix'
 
+export type ReleaseSummary = {
+  id: number
+  version_name: string
+  status: string
+}
+
 export type Defect = {
   id: number
   project_id: number
@@ -15,6 +21,8 @@ export type Defect = {
   status: string
   testcase_id: number | null
   requirement_id: number | null
+  release_id: number | null
+  assignee_user_id: number | null
   found_in_version: string | null
   fixed_in_version: string | null
   created_at: string
@@ -22,11 +30,14 @@ export type Defect = {
 
 export type DefectListItem = Defect & {
   test_case: TestCaseSummary | null
+  assignee_name: string | null
 }
 
 export type DefectDetail = Defect & {
   test_case: TestCaseSummary | null
   requirement: RequirementSummary | null
+  release: ReleaseSummary | null
+  assignee_name: string | null
 }
 
 export type DefectListResponse = {
@@ -44,6 +55,7 @@ export type DefectStats = {
 
 export type DefectListParams = {
   project_id?: number
+  release_id?: number
   requirement_id?: number
   testcase_id?: number
   page?: number
@@ -67,9 +79,24 @@ export const DEFECT_STATUS_BADGE_CLASS: Record<string, string> = {
   'Wont-Fix': 'border border-input text-muted-foreground',
 }
 
+export const SEVERITY_RANK: Record<DefectSeverity, number> = {
+  Critical: 3,
+  High: 2,
+  Medium: 1,
+  Low: 0,
+}
+
+export function compareDefectsBySeverity(a: DefectListItem, b: DefectListItem): number {
+  const rankA = a.severity ? (SEVERITY_RANK[a.severity as DefectSeverity] ?? -1) : -1
+  const rankB = b.severity ? (SEVERITY_RANK[b.severity as DefectSeverity] ?? -1) : -1
+  if (rankA !== rankB) return rankB - rankA
+  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+}
+
 export async function listDefects(params: DefectListParams = {}): Promise<DefectListResponse> {
   const query = new URLSearchParams()
   if (params.project_id !== undefined) query.set('project_id', String(params.project_id))
+  if (params.release_id !== undefined) query.set('release_id', String(params.release_id))
   if (params.requirement_id !== undefined) query.set('requirement_id', String(params.requirement_id))
   if (params.testcase_id !== undefined) query.set('testcase_id', String(params.testcase_id))
   if (params.page) query.set('page', String(params.page))
@@ -96,13 +123,21 @@ export async function createDefect(payload: {
   status?: DefectStatus
   testcase_id?: number
   requirement_id?: number
+  release_id?: number
+  assignee_user_id?: number
 }): Promise<Defect> {
   return authFetch<Defect>('/defects', { method: 'POST', body: payload })
 }
 
 export async function updateDefect(
   id: number,
-  payload: { severity: DefectSeverity; status: DefectStatus; fixed_in_version?: string },
+  payload: {
+    severity: DefectSeverity
+    status: DefectStatus
+    fixed_in_version?: string
+    release_id?: number
+    assignee_user_id?: number
+  },
 ): Promise<Defect> {
   return authFetch<Defect>(`/defects/${id}`, { method: 'PUT', body: payload })
 }

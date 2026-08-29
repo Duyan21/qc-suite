@@ -79,3 +79,9 @@ class ExecutionHistoryItem(BaseModel):
     executed_by_name: str | None
     executed_at: datetime
     images: list[EvidenceImageItem]
+
+
+class BurndownPoint(BaseModel):
+    date: date
+    remaining: int
+    expected: float | None

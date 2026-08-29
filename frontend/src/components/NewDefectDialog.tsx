@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,10 @@ import { TestCaseCombobox } from '@/components/TestCaseCombobox'
 import type { RequirementSummary } from '@/lib/requirements'
 import type { TestCaseSummary } from '@/lib/testCases'
 import { createDefect, type Defect, type DefectSeverity, type DefectStatus } from '@/lib/defects'
+import { listReleases, type Release } from '@/lib/releases'
+import { listMembers, type Member } from '@/lib/members'
+
+const NONE_VALUE = '__none__'
 
 type NewDefectDialogProps = {
   open: boolean
@@ -37,6 +41,14 @@ export function NewDefectDialog({ open, onOpenChange, projectId, defaultSeverity
   const [error, setError] = useState<string | null>(null)
   const [selectedRequirement, setSelectedRequirement] = useState<RequirementSummary | null>(null)
   const [selectedTestCase, setSelectedTestCase] = useState<TestCaseSummary | null>(null)
+  const [releases, setReleases] = useState<Release[]>([])
+  const [members, setMembers] = useState<Member[]>([])
+
+  useEffect(() => {
+    if (!open) return
+    listReleases(projectId).then(setReleases).catch(() => setReleases([]))
+    listMembers(projectId).then(setMembers).catch(() => setMembers([]))
+  }, [open, projectId])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -46,6 +58,8 @@ export function NewDefectDialog({ open, onOpenChange, projectId, defaultSeverity
     const description = String(data.get('description') ?? '').trim()
     const severity = String(data.get('severity') ?? defaultSeverity) as DefectSeverity
     const status = String(data.get('status') ?? 'Open') as DefectStatus
+    const releaseIdRaw = String(data.get('release_id') ?? NONE_VALUE)
+    const assigneeIdRaw = String(data.get('assignee_user_id') ?? NONE_VALUE)
 
     setSubmitting(true)
     setError(null)
@@ -58,6 +72,8 @@ export function NewDefectDialog({ open, onOpenChange, projectId, defaultSeverity
         status,
         testcase_id: selectedTestCase?.id,
         requirement_id: selectedRequirement?.id,
+        release_id: releaseIdRaw === NONE_VALUE ? undefined : Number(releaseIdRaw),
+        assignee_user_id: assigneeIdRaw === NONE_VALUE ? undefined : Number(assigneeIdRaw),
       })
       form.reset()
       setSelectedRequirement(null)
@@ -142,6 +158,34 @@ export function NewDefectDialog({ open, onOpenChange, projectId, defaultSeverity
             <div className="flex flex-col gap-1.5">
               <Label>Link Requirement (tùy chọn)</Label>
               <RequirementCombobox projectId={projectId} value={selectedRequirement} onChange={setSelectedRequirement} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="new-defect-release">Release (tìm thấy ở, tùy chọn)</Label>
+              <Select name="release_id" defaultValue={NONE_VALUE}>
+                <SelectTrigger id="new-defect-release" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_VALUE}>— Không chọn —</SelectItem>
+                  {releases.map((r) => (
+                    <SelectItem key={r.id} value={String(r.id)}>{r.version_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="new-defect-assignee">Assignee (tùy chọn)</Label>
+              <Select name="assignee_user_id" defaultValue={NONE_VALUE}>
+                <SelectTrigger id="new-defect-assignee" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_VALUE}>— Không gán —</SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.user_id} value={String(m.user_id)}>{m.full_name ?? m.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}

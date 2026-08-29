@@ -1,6 +1,8 @@
+from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.all_models import (
@@ -17,6 +19,7 @@ from models.base import get_db
 from schemas.common import RequirementSummary
 from schemas.releases import (
     AddTestCasesRequest,
+    BurndownPoint,
     EvidenceImageItem,
     ExecutionHistoryItem,
     ReleaseCreate,
@@ -124,6 +127,59 @@ def get_release(release_id: int, db: Session = Depends(get_db), current_user: Us
         raise HTTPException(status_code=404, detail="Release not found")
     check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.READ)
     return _release_response(db, release)
+
+
+@router.get("/{release_id}/burndown", response_model=list[BurndownPoint])
+def get_release_burndown(release_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    release = db.get(Release, release_id)
+    if release is None:
+        raise HTTPException(status_code=404, detail="Release not found")
+    check_permission(db, current_user, release.project_id, PermissionArea.TEST_RUNS, PermissionLevel.READ)
+
+    rtc_ids = [
+        rtc_id for (rtc_id,) in db.query(ReleaseTestCase.id).filter(ReleaseTestCase.release_id == release_id).all()
+    ]
+    total = len(rtc_ids)
+    if total == 0:
+        return []
+
+    rows = (
+        db.query(ReleaseTestCaseExecution.release_test_case_id, func.min(ReleaseTestCaseExecution.executed_at))
+        .filter(ReleaseTestCaseExecution.release_test_case_id.in_(rtc_ids))
+        .group_by(ReleaseTestCaseExecution.release_test_case_id)
+        .all()
+    )
+    first_execution_dates = [executed_at.date() for _, executed_at in rows]
+
+    start = release.created_at.date()
+    end = max(date.today(), release.target_date or date.today())
+    if end < start:
+        end = start
+
+    # Ideal/expected line: linear from `total` at `start` to 0 at `target_date`.
+    # Undefined (None on every point) when the release has no target_date to
+    # aim for. `expected_span_days` is floored at 1 to avoid a division by
+    # zero when target_date falls on or before start.
+    target_date = release.target_date
+    expected_span_days = max((target_date - start).days, 1) if target_date else None
+
+    points: list[BurndownPoint] = []
+    current = start
+    while current <= end:
+        executed_by_day = sum(1 for d in first_execution_dates if d <= current)
+        if target_date is not None and expected_span_days is not None:
+            days_remaining = max((target_date - current).days, 0)
+            # Left un-rounded on purpose: this is a continuous reference
+            # trend, not a real discrete count like `remaining` — rounding
+            # to the nearest integer plateaus for 1-2+ days whenever
+            # total < expected_span_days (fewer test cases than days in the
+            # release window), which is the common case.
+            expected = total * days_remaining / expected_span_days
+        else:
+            expected = None
+        points.append(BurndownPoint(date=current, remaining=total - executed_by_day, expected=expected))
+        current += timedelta(days=1)
+    return points
 
 
 @router.patch("/{release_id}/status", response_model=ReleaseResponse)
