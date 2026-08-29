@@ -17,7 +17,14 @@ import {
 import { cn, formatDate } from '@/lib/utils'
 import { useToast } from '@/lib/toast'
 import { getCurrentUser, type CurrentUser } from '@/lib/auth'
-import { createProject, listProjects, updateProject, type Project, type ProjectUpdatePayload } from '@/lib/projects'
+import {
+  createProject,
+  deleteProject,
+  listProjects,
+  updateProject,
+  type Project,
+  type ProjectUpdatePayload,
+} from '@/lib/projects'
 import { listMembers, type Member } from '@/lib/members'
 import { useCurrentProject } from '@/lib/currentProject'
 import { listModules, createModule, updateModule, deleteModule, type Module } from '@/lib/modules'
@@ -52,6 +59,8 @@ export function ProjectsTab() {
   const [form, setForm] = useState<ProjectUpdatePayload | null>(null)
   const [saving, setSaving] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const [moduleList, setModuleList] = useState<Module[]>([])
   const [newModuleName, setNewModuleName] = useState('')
@@ -197,6 +206,23 @@ export function ProjectsTab() {
       .catch((err) => {
         toast.error(err instanceof Error ? err.message : 'Không thể đổi tên module')
       })
+  }
+
+  function handleDeleteProject() {
+    if (!selected) return
+    setDeleting(true)
+    deleteProject(selected.id)
+      .then(() => {
+        setProjects((prev) => prev.filter((p) => p.id !== selected.id))
+        setSelectedId((current) => (current === selected.id ? null : current))
+        setDeleteOpen(false)
+        toast.success(`Đã xoá project "${selected.name}"`)
+        refreshCurrentProject().catch(() => {})
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : 'Không thể xoá project')
+      })
+      .finally(() => setDeleting(false))
   }
 
   function handleDeleteModule(module: Module) {
@@ -423,13 +449,20 @@ export function ProjectsTab() {
                     </select>
                   </div>
 
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setForm(toSettingsForm(selected))} disabled={saving}>
-                      Reset
-                    </Button>
-                    <Button type="button" onClick={handleSaveSettings} disabled={saving}>
-                      {saving ? 'Đang lưu...' : 'Save changes'}
-                    </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    {currentUser?.is_superadmin && (
+                      <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
+                        Delete project
+                      </Button>
+                    )}
+                    <div className="ml-auto flex gap-2">
+                      <Button type="button" variant="outline" onClick={() => setForm(toSettingsForm(selected))} disabled={saving}>
+                        Reset
+                      </Button>
+                      <Button type="button" onClick={handleSaveSettings} disabled={saving}>
+                        {saving ? 'Đang lưu...' : 'Save changes'}
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}
@@ -468,6 +501,30 @@ export function ProjectsTab() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={(open) => !deleting && setDeleteOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xoá project?</DialogTitle>
+            <DialogDescription>
+              {selected && (
+                <>
+                  Project "{selected.name}" sẽ bị ẩn khỏi toàn bộ hệ thống. Hành động này không thể
+                  hoàn tác từ giao diện.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDeleteProject} disabled={deleting}>
+              {deleting ? 'Đang xoá...' : 'Delete project'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
