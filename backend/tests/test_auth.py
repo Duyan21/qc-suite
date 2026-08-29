@@ -13,7 +13,15 @@ def test_me_requires_auth(client):
     assert response.status_code == 401
 
 
-from models.all_models import Project, ProjectMember, User
+from models.all_models import (
+    ExecutionEvidenceImage,
+    Project,
+    ProjectMember,
+    Release,
+    ReleaseTestCase,
+    ReleaseTestCaseExecution,
+    User,
+)
 
 
 def test_first_ever_user_becomes_superadmin(client, db_session):
@@ -25,11 +33,17 @@ def test_first_ever_user_becomes_superadmin(client, db_session):
     # committed data, it just makes the "empty table" precondition true for
     # the duration of this one test.
     #
-    # The shared dev DB also has committed project_members rows and
-    # projects.lead_user_id values that FK-reference existing users (added
-    # by the RBAC schema in tasks 1-4), so a plain `DELETE FROM users` fails
-    # with a ForeignKeyViolation. Clear those referencing rows first — still
-    # entirely inside this test's own transaction, still fully reversible.
+    # The shared dev DB also has committed project_members rows,
+    # projects.lead_user_id values, releases.owner_user_id values, and
+    # release-run rows (added by the RBAC schema in tasks 1-4 and the Test
+    # Runs / Release Report seed data) that FK-reference existing users, so a
+    # plain `DELETE FROM users` fails with a ForeignKeyViolation. Clear those
+    # referencing rows first — still entirely inside this test's own
+    # transaction, still fully reversible.
+    db_session.query(ExecutionEvidenceImage).delete()
+    db_session.query(ReleaseTestCaseExecution).delete()
+    db_session.query(ReleaseTestCase).delete()
+    db_session.query(Release).update({Release.owner_user_id: None})
     db_session.query(ProjectMember).delete()
     db_session.query(Project).update({Project.lead_user_id: None})
     db_session.query(User).delete()

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -95,11 +97,11 @@ def create_project(
 @router.get("", response_model=list[ProjectResponse])
 def list_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.is_superadmin:
-        return db.query(Project).order_by(Project.id).all()
+        return db.query(Project).filter(Project.is_deleted.is_(False)).order_by(Project.id).all()
     return (
         db.query(Project)
         .join(ProjectMember, ProjectMember.project_id == Project.id)
-        .filter(ProjectMember.user_id == current_user.id)
+        .filter(ProjectMember.user_id == current_user.id, Project.is_deleted.is_(False))
         .order_by(Project.id)
         .all()
     )
@@ -108,7 +110,7 @@ def list_projects(db: Session = Depends(get_db), current_user: User = Depends(ge
 @router.get("/{id}", response_model=ProjectResponse)
 def get_project(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     project = db.get(Project, id)
-    if project is None:
+    if project is None or project.is_deleted:
         raise HTTPException(status_code=404, detail="Project not found")
     if not is_project_member(db, current_user, id):
         raise HTTPException(
@@ -126,7 +128,7 @@ def update_project(
     current_user: User = Depends(get_current_user),
 ):
     project = db.get(Project, id)
-    if project is None:
+    if project is None or project.is_deleted:
         raise HTTPException(status_code=404, detail="Project not found")
     check_permission(db, current_user, id, PermissionArea.PROJECT_SETTINGS, PermissionLevel.EDIT)
 
@@ -143,6 +145,27 @@ def update_project(
     db.commit()
     db.refresh(project)
     return project
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.is_superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires superadmin",
+        )
+
+    project = db.get(Project, id)
+    if project is None or project.is_deleted:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project.is_deleted = True
+    project.deleted_at = datetime.now(timezone.utc)
+    db.commit()
 
 
 @router.get("/{id}/members", response_model=list[MemberResponse])

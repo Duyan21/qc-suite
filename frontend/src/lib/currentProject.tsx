@@ -44,7 +44,10 @@ export function CurrentProjectProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const list = await listProjects()
     setProjects(list)
-    setProjectState((prev) => (prev ? (list.find((p) => p.id === prev.id) ?? prev) : prev))
+    setProjectState((prev) => {
+      if (!prev) return prev
+      return list.find((p) => p.id === prev.id) ?? list[0] ?? null
+    })
   }, [])
 
   const value = useMemo(

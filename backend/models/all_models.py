@@ -33,6 +33,8 @@ class Project(Base):
     auto_resolve_days = Column(Integer, nullable=True)
     ai_impact_suggestions = Column(Boolean, default=True)
     default_severity = Column(String(20), default="Medium")
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(TIMESTAMP, nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 

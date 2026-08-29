@@ -305,3 +305,37 @@ def test_non_admin_member_can_still_be_removed(client, auth_headers, project, me
     assert client.delete(
         f"/projects/{project.id}/members/{member_user.id}", headers=auth_headers
     ).status_code == 204
+
+
+def test_delete_project_as_superadmin(client, auth_headers, project, db_session):
+    response = client.delete(f"/projects/{project.id}", headers=auth_headers)
+    assert response.status_code == 204
+
+    db_session.refresh(project)
+    assert project.is_deleted is True
+    assert project.deleted_at is not None
+
+    assert client.get(f"/projects/{project.id}", headers=auth_headers).status_code == 404
+    ids = {p["id"] for p in client.get("/projects", headers=auth_headers).json()}
+    assert project.id not in ids
+
+
+def test_delete_project_requires_superadmin(client, member_auth_headers, project, member_user, role_by_key, db_session):
+    admin = role_by_key("admin")
+    db_session.add(ProjectMember(project_id=project.id, user_id=member_user.id, role_id=admin.id))
+    db_session.commit()
+
+    response = client.delete(f"/projects/{project.id}", headers=member_auth_headers)
+    assert response.status_code == 403
+
+    db_session.refresh(project)
+    assert project.is_deleted is False
+
+
+def test_delete_project_twice_returns_404(client, auth_headers, project):
+    assert client.delete(f"/projects/{project.id}", headers=auth_headers).status_code == 204
+    assert client.delete(f"/projects/{project.id}", headers=auth_headers).status_code == 404
+
+
+def test_delete_nonexistent_project_returns_404(client, auth_headers):
+    assert client.delete("/projects/999999", headers=auth_headers).status_code == 404
