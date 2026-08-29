@@ -1,18 +1,30 @@
-// One-time conversion script: decompresses the Vietnamese-subset Roboto
-// WOFF2 files (already present via the @fontsource/roboto dependency) into
-// raw TTF bytes, base64-encodes them, and writes a TS module jsPDF can
-// register as a custom font via addFileToVFS/addFont. jsPDF's built-in
-// standard fonts don't cover Vietnamese diacritics, so the exported report
-// needs its own embedded font. Not part of the app build — run manually
-// whenever the font needs regenerating:
+// One-time conversion script: decompresses the Roboto WOFF2 files (from the
+// roboto-fontface dependency) into raw TTF bytes, base64-encodes them, and
+// writes a TS module jsPDF can register as a custom font via
+// addFileToVFS/addFont. jsPDF's built-in standard fonts don't cover
+// Vietnamese diacritics, so the exported report needs its own embedded font.
+//
+// IMPORTANT: must be the *unsplit* roboto-fontface package, not
+// @fontsource/roboto's unicode-range-subset files (e.g.
+// "roboto-vietnamese-400-normal.woff2") — those are deliberately split by
+// Google Fonts for web delivery and the "vietnamese" subset alone excludes
+// plain Latin letters (verified: its cmap has no entry for 'H'/'e'/'l'/'o'
+// etc., only Vietnamese-specific codepoints + a handful of shared basics).
+// jsPDF embeds exactly one font file with no merging, so the file must carry
+// full glyph coverage on its own. roboto-fontface's Roboto-Regular.woff2 is
+// the same underlying Roboto but shipped as one unsplit file (verified: its
+// cmap covers both 'H'/'e'/'l'/'o' and Vietnamese letters like ư/ơ/ệ/đ).
+//
+// Not part of the app build — run manually whenever the font needs
+// regenerating:
 //   node scripts/convert-pdf-font.cjs
 const fs = require('fs')
 const path = require('path')
 const wawoff2 = require('wawoff2')
 
 const SOURCES = {
-  normal: 'node_modules/@fontsource/roboto/files/roboto-vietnamese-400-normal.woff2',
-  bold: 'node_modules/@fontsource/roboto/files/roboto-vietnamese-700-normal.woff2',
+  normal: 'node_modules/roboto-fontface/fonts/roboto/Roboto-Regular.woff2',
+  bold: 'node_modules/roboto-fontface/fonts/roboto/Roboto-Bold.woff2',
 }
 
 async function main() {
