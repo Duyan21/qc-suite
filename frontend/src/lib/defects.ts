@@ -131,7 +131,13 @@ export async function createDefect(payload: {
 
 export async function updateDefect(
   id: number,
-  payload: { severity: DefectSeverity; status: DefectStatus; fixed_in_version?: string; assignee_user_id?: number },
+  payload: {
+    severity: DefectSeverity
+    status: DefectStatus
+    fixed_in_version?: string
+    release_id?: number
+    assignee_user_id?: number
+  },
 ): Promise<Defect> {
   return authFetch<Defect>(`/defects/${id}`, { method: 'PUT', body: payload })
 }

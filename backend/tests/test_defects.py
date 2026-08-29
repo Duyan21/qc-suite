@@ -716,3 +716,63 @@ def test_list_defects_by_release_id_alone_succeeds_for_a_member(client, db_sessi
 
     response = client.get(f"/defects?release_id={release.id}", headers=member_auth_headers)
     assert response.status_code == 200
+
+
+def test_update_defect_sets_and_clears_release(client, auth_headers, db_session, project):
+    from datetime import date
+
+    release = Release(project_id=project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    create_resp = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    )
+    defect_id = create_resp.json()["id"]
+
+    set_resp = client.put(
+        f"/defects/{defect_id}",
+        json={"severity": "Low", "status": "Open", "release_id": release.id},
+        headers=auth_headers,
+    )
+    assert set_resp.status_code == 200
+    assert set_resp.json()["release_id"] == release.id
+
+    clear_resp = client.put(
+        f"/defects/{defect_id}",
+        json={"severity": "Low", "status": "Open"},
+        headers=auth_headers,
+    )
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["release_id"] is None
+
+
+def test_update_defect_rejects_release_id_from_other_project(client, auth_headers, db_session, project):
+    from datetime import date
+
+    other_project = Project(name="Other", description="d", key="OTH4")
+    db_session.add(other_project)
+    db_session.commit()
+    db_session.refresh(other_project)
+
+    release = Release(project_id=other_project.id, version_name="v1.0.0", target_date=date.today())
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    create_resp = client.post(
+        "/defects",
+        json={"title": "Bug", "severity": "Low", "status": "Open", "project_id": project.id},
+        headers=auth_headers,
+    )
+    defect_id = create_resp.json()["id"]
+
+    response = client.put(
+        f"/defects/{defect_id}",
+        json={"severity": "Low", "status": "Open", "release_id": release.id},
+        headers=auth_headers,
+    )
+    assert response.status_code == 400
