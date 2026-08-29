@@ -44,3 +44,7 @@ export async function createProject(payload: {
 export async function updateProject(id: number, payload: ProjectUpdatePayload): Promise<Project> {
   return authFetch<Project>(`/projects/${id}`, { method: 'PUT', body: payload })
 }
+
+export async function deleteProject(id: number): Promise<void> {
+  await authFetch<void>(`/projects/${id}`, { method: 'DELETE' })
+}
