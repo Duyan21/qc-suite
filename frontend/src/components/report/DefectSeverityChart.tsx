@@ -20,12 +20,17 @@ export function DefectSeverityChart({ counts, selected, onSelect }: DefectSeveri
   const data = SEVERITIES.map((severity) => ({ severity, count: counts[severity] ?? 0 }))
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={220} minWidth={300} minHeight={220}>
       <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
         <XAxis dataKey="severity" tick={{ fontSize: 12 }} />
         <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
         <Tooltip />
-        <Bar dataKey="count" cursor="pointer" onClick={(entry) => onSelect((entry.payload as { severity: DefectSeverity }).severity)}>
+        <Bar
+          dataKey="count"
+          cursor="pointer"
+          isAnimationActive={false}
+          onClick={(entry) => onSelect((entry.payload as { severity: DefectSeverity }).severity)}
+        >
           {data.map((entry) => (
             <Cell
               key={entry.severity}
