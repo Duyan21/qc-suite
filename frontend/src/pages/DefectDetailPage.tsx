@@ -205,8 +205,8 @@ export function DefectDetailPage() {
           onOpenChange={setEditOpen}
           defect={defect}
           onUpdated={(updated) => {
-            setDefect((d) => (d ? { ...d, ...updated } : d))
             toast.success(`Đã cập nhật defect ${updated.code}.`)
+            getDefect(updated.id).then(setDefect).catch(() => {})
           }}
         />
       )}

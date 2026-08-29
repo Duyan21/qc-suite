@@ -11,7 +11,7 @@ Run from backend/ with the venv active and the DB up:
 import json
 import os
 import random
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from models.all_models import (
     Defect,
@@ -117,6 +117,7 @@ def seed_users(db, project):
 
 def seed_releases(db, project, admin_user):
     today = date.today()
+    now = datetime.utcnow()
     releases = [
         Release(
             project_id=project.id,
@@ -124,6 +125,7 @@ def seed_releases(db, project, admin_user):
             note="SIT build, first full regression pass.",
             target_date=today + timedelta(days=14),
             owner_user_id=admin_user.id,
+            created_at=now - timedelta(days=14),
         ),
         Release(
             project_id=project.id,
@@ -131,6 +133,7 @@ def seed_releases(db, project, admin_user):
             note="UAT candidate, includes AML and income-policy fixes.",
             target_date=today + timedelta(days=30),
             owner_user_id=admin_user.id,
+            created_at=now - timedelta(days=7),
         ),
         Release(
             project_id=project.id,
@@ -264,11 +267,18 @@ def seed_defects(db, project, test_cases, requirements, defect_data, releases, u
     return defects
 
 
+def _stagger_executed_at(release_created_at, today):
+    span_days = max((today - release_created_at.date()).days, 1)
+    offset_days = random.randint(0, span_days)
+    return release_created_at + timedelta(days=offset_days)
+
+
 def seed_release_test_cases(db, releases, test_cases, defect_data, executed_by):
     """SIT run covers full regression; UAT run covers a targeted subset.
     Results for defect-linked test cases are consistent with defect status
     instead of random, so traceability data tells a coherent story.
     """
+    today = date.today()
     defect_by_tc = {row["tc_id"]: row for row in defect_data if row["tc_id"]}
 
     sit_release = next(r for r in releases if r.version_name == "v1.0.0-SIT")
@@ -291,6 +301,7 @@ def seed_release_test_cases(db, releases, test_cases, defect_data, executed_by):
                 result=result,
                 note="SIT full regression run.",
                 executed_by=executed_by,
+                executed_at=_stagger_executed_at(sit_release.created_at, today),
             )
         )
 
@@ -314,6 +325,7 @@ def seed_release_test_cases(db, releases, test_cases, defect_data, executed_by):
                 result=result,
                 note="UAT targeted regression run.",
                 executed_by=executed_by,
+                executed_at=_stagger_executed_at(uat_release.created_at, today),
             )
         )
 

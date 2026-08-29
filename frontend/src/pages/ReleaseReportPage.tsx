@@ -55,6 +55,8 @@ export function ReleaseReportPage() {
     }
     const requestId = ++releasesRequestIdRef.current
     setError(null)
+    setReleases(null)
+    setSelectedId(null)
     listReleases(project.id)
       .then((result) => {
         if (releasesRequestIdRef.current !== requestId) return
