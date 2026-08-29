@@ -35,16 +35,16 @@ export function DefectList({ items, page, onPageChange }: DefectListProps) {
               navigate(`/defects/${d.id}`)
             }
           }}
-          className="flex-row items-center justify-between gap-3 p-3 cursor-pointer transition-colors hover:bg-muted/50"
+          className="grid grid-cols-3 items-center gap-x-[30px] p-3 cursor-pointer transition-colors hover:bg-muted/50"
         >
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <p className="truncate font-medium">{d.title}</p>
             <p className="text-xs text-muted-foreground">{d.assignee_name ?? 'Chưa gán'}</p>
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <p className="truncate text-sm text-muted-foreground">{d.description ?? ''}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex min-w-0 items-center justify-end gap-2">
             <Badge className={DEFECT_SEVERITY_BADGE_CLASS[d.severity ?? ''] ?? ''}>{d.severity ?? '—'}</Badge>
             <Badge className={DEFECT_STATUS_BADGE_CLASS[d.status] ?? ''}>{d.status}</Badge>
           </div>
