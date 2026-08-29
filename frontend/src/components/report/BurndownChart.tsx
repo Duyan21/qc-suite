@@ -1,4 +1,4 @@
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BurndownPoint } from '@/lib/releases'
 import { formatDate } from '@/lib/utils'
 
@@ -14,7 +14,17 @@ export function BurndownChart({ points }: { points: BurndownPoint[] }) {
         <XAxis dataKey="date" tickFormatter={(d: string) => formatDate(d)} tick={{ fontSize: 12 }} />
         <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
         <Tooltip labelFormatter={(d) => formatDate(d as string)} />
-        <Line type="monotone" dataKey="remaining" stroke="#3b82f6" strokeWidth={2} dot={false} />
+        <Legend />
+        <Line type="monotone" dataKey="remaining" name="Thực tế" stroke="#3b82f6" strokeWidth={2} dot={false} />
+        <Line
+          type="monotone"
+          dataKey="expected"
+          name="Kỳ vọng"
+          stroke="#9ca3af"
+          strokeWidth={2}
+          strokeDasharray="6 4"
+          dot={false}
+        />
       </LineChart>
     </ResponsiveContainer>
   )

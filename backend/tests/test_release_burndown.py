@@ -140,3 +140,59 @@ def test_burndown_multi_day_walk_and_first_execution_only(client, auth_headers, 
     assert points[day0] == 1  # not yet executed on day 0
     assert points[day1] == 0  # first execution lands here — remaining drops
     assert points[day2] == 0  # second execution on the SAME test case shouldn't change anything further
+
+
+def test_burndown_expected_line_is_linear_from_total_to_zero_at_target_date(client, auth_headers, db_session, project):
+    created = datetime.utcnow() - timedelta(days=4)
+    target = date.today()
+    release = Release(
+        project_id=project.id,
+        version_name="v1.0.0",
+        target_date=target,
+        created_at=created,
+    )
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    req = _create_requirement_row(db_session, project)
+    for _ in range(4):
+        tc = _create_test_case_row(db_session, req.id)
+        db_session.add(ReleaseTestCase(release_id=release.id, testcase_id=tc.id))
+    db_session.commit()
+
+    response = client.get(f"/releases/{release.id}/burndown", headers=auth_headers)
+    assert response.status_code == 200
+    points = {p["date"]: p["expected"] for p in response.json()}
+
+    day0 = created.date().isoformat()
+    day2 = (created + timedelta(days=2)).date().isoformat()
+    day4 = target.isoformat()
+
+    assert points[day0] == 4
+    assert points[day2] == 2
+    assert points[day4] == 0
+
+
+def test_burndown_expected_is_none_without_target_date(client, auth_headers, db_session, project):
+    created = datetime.utcnow() - timedelta(days=2)
+    release = Release(
+        project_id=project.id,
+        version_name="v1.0.0",
+        target_date=None,
+        created_at=created,
+    )
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    req = _create_requirement_row(db_session, project)
+    tc = _create_test_case_row(db_session, req.id)
+    db_session.add(ReleaseTestCase(release_id=release.id, testcase_id=tc.id))
+    db_session.commit()
+
+    response = client.get(f"/releases/{release.id}/burndown", headers=auth_headers)
+    assert response.status_code == 200
+    points = response.json()
+    assert len(points) >= 1
+    assert all(p["expected"] is None for p in points)

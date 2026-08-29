@@ -156,11 +156,23 @@ def get_release_burndown(release_id: int, db: Session = Depends(get_db), current
     if end < start:
         end = start
 
+    # Ideal/expected line: linear from `total` at `start` to 0 at `target_date`.
+    # Undefined (None on every point) when the release has no target_date to
+    # aim for. `expected_span_days` is floored at 1 to avoid a division by
+    # zero when target_date falls on or before start.
+    target_date = release.target_date
+    expected_span_days = max((target_date - start).days, 1) if target_date else None
+
     points: list[BurndownPoint] = []
     current = start
     while current <= end:
         executed_by_day = sum(1 for d in first_execution_dates if d <= current)
-        points.append(BurndownPoint(date=current, remaining=total - executed_by_day))
+        if target_date is not None and expected_span_days is not None:
+            days_remaining = max((target_date - current).days, 0)
+            expected = round(total * days_remaining / expected_span_days)
+        else:
+            expected = None
+        points.append(BurndownPoint(date=current, remaining=total - executed_by_day, expected=expected))
         current += timedelta(days=1)
     return points
 
