@@ -140,3 +140,94 @@ def test_burndown_multi_day_walk_and_first_execution_only(client, auth_headers, 
     assert points[day0] == 1  # not yet executed on day 0
     assert points[day1] == 0  # first execution lands here — remaining drops
     assert points[day2] == 0  # second execution on the SAME test case shouldn't change anything further
+
+
+def test_burndown_expected_line_is_linear_from_total_to_zero_at_target_date(client, auth_headers, db_session, project):
+    created = datetime.utcnow() - timedelta(days=4)
+    target = date.today()
+    release = Release(
+        project_id=project.id,
+        version_name="v1.0.0",
+        target_date=target,
+        created_at=created,
+    )
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    req = _create_requirement_row(db_session, project)
+    for _ in range(4):
+        tc = _create_test_case_row(db_session, req.id)
+        db_session.add(ReleaseTestCase(release_id=release.id, testcase_id=tc.id))
+    db_session.commit()
+
+    response = client.get(f"/releases/{release.id}/burndown", headers=auth_headers)
+    assert response.status_code == 200
+    points = {p["date"]: p["expected"] for p in response.json()}
+
+    day0 = created.date().isoformat()
+    day2 = (created + timedelta(days=2)).date().isoformat()
+    day4 = target.isoformat()
+
+    assert points[day0] == 4
+    assert points[day2] == 2
+    assert points[day4] == 0
+
+
+def test_burndown_expected_line_decreases_every_day_not_just_every_other_day(client, auth_headers, db_session, project):
+    # 3 test cases over a 10-day span: 0.3/day. Rounding to the nearest
+    # integer would plateau (e.g. 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0), which is
+    # exactly the "flat for two days" bug reported against the real chart.
+    # The un-rounded projection must be strictly non-increasing and actually
+    # move every day.
+    created = datetime.utcnow() - timedelta(days=10)
+    target = date.today()
+    release = Release(
+        project_id=project.id,
+        version_name="v1.0.0",
+        target_date=target,
+        created_at=created,
+    )
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    req = _create_requirement_row(db_session, project)
+    for _ in range(3):
+        tc = _create_test_case_row(db_session, req.id)
+        db_session.add(ReleaseTestCase(release_id=release.id, testcase_id=tc.id))
+    db_session.commit()
+
+    response = client.get(f"/releases/{release.id}/burndown", headers=auth_headers)
+    assert response.status_code == 200
+    points = [p["expected"] for p in response.json()]
+
+    assert len(points) == 11  # day 0 (created) through day 10 (target), inclusive
+    assert points == sorted(points, reverse=True)
+    assert len(set(points)) == len(points), f"expected repeated values across days: {points}"
+    assert points[0] == 3
+    assert points[-1] == 0
+
+
+def test_burndown_expected_is_none_without_target_date(client, auth_headers, db_session, project):
+    created = datetime.utcnow() - timedelta(days=2)
+    release = Release(
+        project_id=project.id,
+        version_name="v1.0.0",
+        target_date=None,
+        created_at=created,
+    )
+    db_session.add(release)
+    db_session.commit()
+    db_session.refresh(release)
+
+    req = _create_requirement_row(db_session, project)
+    tc = _create_test_case_row(db_session, req.id)
+    db_session.add(ReleaseTestCase(release_id=release.id, testcase_id=tc.id))
+    db_session.commit()
+
+    response = client.get(f"/releases/{release.id}/burndown", headers=auth_headers)
+    assert response.status_code == 200
+    points = response.json()
+    assert len(points) >= 1
+    assert all(p["expected"] is None for p in points)

@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -12,6 +13,7 @@ type DefectListProps = {
 }
 
 export function DefectList({ items, page, onPageChange }: DefectListProps) {
+  const navigate = useNavigate()
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
   const pageItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -22,12 +24,27 @@ export function DefectList({ items, page, onPageChange }: DefectListProps) {
   return (
     <div className="flex flex-col gap-2">
       {pageItems.map((d) => (
-        <Card key={d.id} className="flex-row items-center justify-between gap-3 p-3">
-          <div className="min-w-0 flex-1">
+        <Card
+          key={d.id}
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate(`/defects/${d.id}`)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              navigate(`/defects/${d.id}`)
+            }
+          }}
+          className="grid grid-cols-3 items-center gap-x-[30px] p-3 cursor-pointer transition-colors hover:bg-muted/50"
+        >
+          <div className="min-w-0">
             <p className="truncate font-medium">{d.title}</p>
             <p className="text-xs text-muted-foreground">{d.assignee_name ?? 'Chưa gán'}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm text-muted-foreground">{d.description ?? ''}</p>
+          </div>
+          <div className="flex min-w-0 items-center justify-end gap-2">
             <Badge className={DEFECT_SEVERITY_BADGE_CLASS[d.severity ?? ''] ?? ''}>{d.severity ?? '—'}</Badge>
             <Badge className={DEFECT_STATUS_BADGE_CLASS[d.status] ?? ''}>{d.status}</Badge>
           </div>

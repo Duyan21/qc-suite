@@ -218,6 +218,10 @@ def update_defect(id: int, payload: DefectUpdate, db: Session = Depends(get_db),
     if defect is None:
         raise HTTPException(status_code=404, detail="Defect not found")
     check_permission(db, current_user, defect.project_id, PermissionArea.DEFECTS, PermissionLevel.EDIT)
+    if payload.release_id is not None:
+        release = db.get(Release, payload.release_id)
+        if release is None or release.project_id != defect.project_id:
+            raise HTTPException(status_code=400, detail="release_id not found in this project")
     if payload.assignee_user_id is not None:
         assignee = db.get(User, payload.assignee_user_id)
         if assignee is None or not is_project_member(db, assignee, defect.project_id):
@@ -226,6 +230,7 @@ def update_defect(id: int, payload: DefectUpdate, db: Session = Depends(get_db),
     defect.severity = payload.severity
     defect.status = payload.status
     defect.fixed_in_version = payload.fixed_in_version
+    defect.release_id = payload.release_id
     defect.assignee_user_id = payload.assignee_user_id
     db.commit()
     db.refresh(defect)

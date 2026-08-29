@@ -25,6 +25,7 @@ class DefectUpdate(BaseModel):
     severity: DefectSeverity
     status: DefectStatus
     fixed_in_version: str | None = None
+    release_id: int | None = None
     assignee_user_id: int | None = None
 
 

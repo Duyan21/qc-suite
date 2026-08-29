@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Download } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCurrentProject } from '@/lib/currentProject'
+import { generateReportPdf } from '@/lib/exportReportPdf'
 import { listReleases, getBurndown, type Release, type BurndownPoint } from '@/lib/releases'
 import {
   listDefects,
@@ -44,6 +47,7 @@ export function ReleaseReportPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
   const requestIdRef = useRef(0)
   const releasesRequestIdRef = useRef(0)
 
@@ -157,22 +161,47 @@ export function ReleaseReportPage() {
     )
   }
 
+  function handleExport() {
+    if (!selectedRelease || !project) return
+    setExporting(true)
+    try {
+      generateReportPdf({
+        projectName: project.name,
+        release: selectedRelease,
+        burndown,
+        openDefectsCount: openDefects.length,
+        severityCounts,
+        statusCounts,
+        defects: filteredDefects,
+        passRate,
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-heading text-xl font-semibold">Release Report</h1>
-        <Select value={selectedId ? String(selectedId) : undefined} onValueChange={(value) => setSelectedId(Number(value))}>
-          <SelectTrigger className="w-full sm:w-64">
-            <SelectValue placeholder="Chọn release" />
-          </SelectTrigger>
-          <SelectContent>
-            {(releases ?? []).map((r) => (
-              <SelectItem key={r.id} value={String(r.id)}>
-                {r.version_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Select value={selectedId ? String(selectedId) : undefined} onValueChange={(value) => setSelectedId(Number(value))}>
+            <SelectTrigger className="w-full sm:w-64">
+              <SelectValue placeholder="Chọn release" />
+            </SelectTrigger>
+            <SelectContent>
+              {(releases ?? []).map((r) => (
+                <SelectItem key={r.id} value={String(r.id)}>
+                  {r.version_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button type="button" variant="outline" disabled={!selectedRelease || exporting} onClick={handleExport}>
+            <Download />
+            {exporting ? 'Đang xuất...' : 'Xuất báo cáo (PDF)'}
+          </Button>
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}

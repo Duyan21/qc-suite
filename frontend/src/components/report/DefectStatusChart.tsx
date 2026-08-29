@@ -24,7 +24,7 @@ export function DefectStatusChart({ counts, selected, onSelect }: DefectStatusCh
   }
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={220} minWidth={300} minHeight={220}>
       <PieChart>
         <Tooltip />
         <Pie
@@ -35,6 +35,7 @@ export function DefectStatusChart({ counts, selected, onSelect }: DefectStatusCh
           cy="50%"
           outerRadius={80}
           cursor="pointer"
+          isAnimationActive={false}
           onClick={(entry) => onSelect((entry.payload as { status: DefectStatus }).status)}
         >
           {data.map((entry) => (

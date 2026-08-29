@@ -56,6 +56,7 @@ export type ExecutionHistoryItem = {
 export type BurndownPoint = {
   date: string
   remaining: number
+  expected: number | null
 }
 
 export const RELEASE_STATUS_BADGE_CLASS: Record<string, string> = {
