@@ -35,7 +35,7 @@ export function DefectStatusChart({ counts, selected, onSelect }: DefectStatusCh
           cy="50%"
           outerRadius={80}
           cursor="pointer"
-          onClick={(entry) => onSelect(entry.status as DefectStatus)}
+          onClick={(entry) => onSelect((entry.payload as { status: DefectStatus }).status)}
         >
           {data.map((entry) => (
             <Cell

@@ -25,7 +25,7 @@ export function DefectSeverityChart({ counts, selected, onSelect }: DefectSeveri
         <XAxis dataKey="severity" tick={{ fontSize: 12 }} />
         <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
         <Tooltip />
-        <Bar dataKey="count" cursor="pointer" onClick={(entry) => onSelect(entry.severity as DefectSeverity)}>
+        <Bar dataKey="count" cursor="pointer" onClick={(entry) => onSelect((entry.payload as { severity: DefectSeverity }).severity)}>
           {data.map((entry) => (
             <Cell
               key={entry.severity}
