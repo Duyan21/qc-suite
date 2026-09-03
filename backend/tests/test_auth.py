@@ -101,3 +101,110 @@ def test_invited_user_with_empty_password_gets_401_not_500(client, db_session):
     )
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid email or password"
+
+
+def test_forgot_password_returns_token_for_existing_user(client, db_session):
+    from services.auth_service import hash_password
+
+    user = User(email="fp.known@example.com", hashed_password=hash_password("OldPassw0rd!"))
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post("/auth/forgot-password", json={"email": "fp.known@example.com"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["reset_token"]
+    assert data["expires_in"] == "15 minutes"
+
+    db_session.refresh(user)
+    assert user.reset_token == data["reset_token"]
+    assert user.reset_token_exp is not None
+
+
+def test_forgot_password_same_response_shape_for_unknown_email(client):
+    """Must not leak whether the email exists — same status code and shape either way."""
+    response = client.post("/auth/forgot-password", json={"email": "does.not.exist@example.com"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["reset_token"]
+    assert data["expires_in"] == "15 minutes"
+
+
+def test_forgot_password_unknown_email_does_not_write_to_any_user(client, db_session, test_user):
+    response = client.post("/auth/forgot-password", json={"email": "does.not.exist@example.com"})
+    token = response.json()["reset_token"]
+
+    reset_response = client.post(
+        "/auth/reset-password", json={"token": token, "new_password": "WhateverPass1!"}
+    )
+    assert reset_response.status_code == 400
+
+    db_session.refresh(test_user)
+    assert test_user.reset_token is None
+
+
+def test_reset_password_with_valid_token_changes_password_and_is_single_use(client, db_session):
+    from services.auth_service import hash_password
+
+    user = User(email="fp.reset@example.com", hashed_password=hash_password("OldPassw0rd!"))
+    db_session.add(user)
+    db_session.commit()
+
+    token = client.post("/auth/forgot-password", json={"email": "fp.reset@example.com"}).json()["reset_token"]
+
+    response = client.post(
+        "/auth/reset-password", json={"token": token, "new_password": "NewPassw0rd!"}
+    )
+    assert response.status_code == 200
+    assert response.json() == {"message": "Password reset successful"}
+
+    old_login = client.post(
+        "/auth/login", json={"email": "fp.reset@example.com", "password": "OldPassw0rd!"}
+    )
+    assert old_login.status_code == 401
+
+    new_login = client.post(
+        "/auth/login", json={"email": "fp.reset@example.com", "password": "NewPassw0rd!"}
+    )
+    assert new_login.status_code == 200
+
+    reused = client.post(
+        "/auth/reset-password", json={"token": token, "new_password": "AnotherPass1!"}
+    )
+    assert reused.status_code == 400
+    assert reused.json()["detail"] == "Invalid or expired token"
+
+
+def test_reset_password_rejects_unknown_token(client):
+    response = client.post(
+        "/auth/reset-password", json={"token": "totally-bogus-token", "new_password": "WhateverPass1!"}
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid or expired token"
+
+
+def test_reset_password_rejects_expired_token(client, db_session):
+    from datetime import datetime, timedelta
+
+    from services.auth_service import hash_password
+
+    user = User(email="fp.expired@example.com", hashed_password=hash_password("OldPassw0rd!"))
+    db_session.add(user)
+    db_session.commit()
+
+    token = client.post("/auth/forgot-password", json={"email": "fp.expired@example.com"}).json()["reset_token"]
+    user.reset_token_exp = datetime.utcnow() - timedelta(minutes=1)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/reset-password", json={"token": token, "new_password": "NewPassw0rd!"}
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid or expired token"
+
+
+def test_reset_password_rejects_short_new_password(client):
+    response = client.post(
+        "/auth/reset-password", json={"token": "whatever", "new_password": "short"}
+    )
+    assert response.status_code == 422

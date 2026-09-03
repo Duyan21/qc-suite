@@ -5,6 +5,7 @@ export { getToken, clearToken } from './api'
 const ERROR_MESSAGES: Record<string, string> = {
   'Invalid email or password': 'Email hoặc mật khẩu không đúng',
   'Email already registered': 'Email đã được sử dụng',
+  'Invalid or expired token': 'Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
 }
 
 function toVietnameseError(err: unknown): Error {
@@ -40,16 +41,32 @@ export async function register(name: string, email: string, password: string): P
   }
 }
 
-export async function requestPasswordReset(email: string): Promise<void> {
+type ForgotPasswordResponse = {
+  reset_token: string
+  expires_in: string
+}
+
+// Dev/demo environment has no email service: the backend hands the reset
+// token straight back in the response instead of mailing a link, so the UI
+// surfaces it directly (see ForgotPasswordPage).
+export async function requestPasswordReset(email: string): Promise<ForgotPasswordResponse> {
   try {
-    await apiFetch('/auth/forgot-password', {
+    return await apiFetch<ForgotPasswordResponse>('/auth/forgot-password', {
       method: 'POST',
       body: { email },
     })
   } catch (err) {
-    if (err instanceof Error && err.message === 'User not found') {
-      return
-    }
+    throw toVietnameseError(err)
+  }
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  try {
+    await apiFetch('/auth/reset-password', {
+      method: 'POST',
+      body: { token, new_password: newPassword },
+    })
+  } catch (err) {
     throw toVietnameseError(err)
   }
 }

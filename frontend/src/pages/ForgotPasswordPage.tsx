@@ -11,15 +11,15 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
+  const [resetToken, setResetToken] = useState<string | null>(null)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      await requestPasswordReset(email)
-      setSent(true)
+      const response = await requestPasswordReset(email)
+      setResetToken(response.reset_token)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gửi link reset thất bại')
     } finally {
@@ -32,10 +32,20 @@ export function ForgotPasswordPage() {
       <h1 className="text-lg font-semibold">Quên mật khẩu</h1>
       <p className="text-sm text-muted-foreground">Nhập email để nhận link reset mật khẩu</p>
 
-      {sent ? (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Nếu email tồn tại trong hệ thống, bạn sẽ nhận được link đặt lại mật khẩu trong ít phút.
-        </p>
+      {resetToken ? (
+        <div className="mt-4 flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Nếu email tồn tại trong hệ thống, bạn sẽ nhận được link đặt lại mật khẩu trong ít
+            phút. Môi trường demo này chưa gửi email, nên reset token dùng để test được hiển thị
+            trực tiếp bên dưới:
+          </p>
+          <code className="break-all rounded-md bg-muted px-3 py-2 text-xs">{resetToken}</code>
+          <Button asChild size="lg" className="w-full bg-indigo-600 text-white hover:bg-indigo-700">
+            <Link to={`/reset-password?token=${encodeURIComponent(resetToken)}`}>
+              Đặt lại mật khẩu ngay
+            </Link>
+          </Button>
+        </div>
       ) : (
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
