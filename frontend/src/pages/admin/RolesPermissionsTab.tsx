@@ -39,7 +39,7 @@ export function RolesPermissionsTab() {
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Không thể tải ma trận quyền'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [toast])
 
   const cellByRoleArea = useMemo(() => {
     const map = new Map<string, PermissionMatrixCell>()

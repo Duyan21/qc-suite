@@ -74,7 +74,7 @@ export function UsersAccessTab() {
         setProjectId(projectList[0]?.id ?? null)
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Không thể tải dữ liệu'))
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     if (projectId === null) {
@@ -97,7 +97,7 @@ export function UsersAccessTab() {
         if (requestIdRef.current !== requestId) return
         setLoading(false)
       })
-  }, [projectId])
+  }, [projectId, toast])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()

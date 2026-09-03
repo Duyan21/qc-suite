@@ -13,6 +13,7 @@ backend/uploads/
 # Node
 node_modules/
 dist/
+coverage/
 
 # IDE
 .vscode/
@@ -22,12 +23,10 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Claude Code local state
-.claude/cache/
-.claude/tmp/
-.claude/*.log
-.claude/session/
-.claude/worktrees/
+# Claude Code local state / reference docs (not part of the tracked repo)
+CLAUDE.md
+.claude/
 .superpowers/
 docs/superpowers/
+docs/*.docx
 .worktrees/

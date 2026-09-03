@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -68,8 +68,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [push],
   )
 
+  const value = useMemo(() => ({ success, error }), [success, error])
+
   return (
-    <ToastContext.Provider value={{ success, error }}>
+    <ToastContext.Provider value={value}>
       {children}
       <div className="fixed bottom-4 right-4 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2">
         {toasts.map((t) => (
