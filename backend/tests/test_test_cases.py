@@ -46,7 +46,7 @@ def test_create_test_case_generates_code(client, auth_headers, db_session):
     response = _create_test_case(client, auth_headers, req.id)
     assert response.status_code == 201
     data = response.json()
-    assert re.fullmatch(r"TC-\d+", data["code"])
+    assert re.fullmatch(r"TC-\d+-\d+", data["code"])
     assert data["status"] == "Draft"
 
 
