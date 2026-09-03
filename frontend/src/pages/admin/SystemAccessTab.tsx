@@ -30,7 +30,7 @@ export function SystemAccessTab() {
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Không thể tải danh sách người dùng'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     setPage(1)
