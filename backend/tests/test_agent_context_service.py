@@ -30,7 +30,7 @@ def _make_requirement(db_session, project, req_id, version, is_current, previous
 
 
 @requires_real_gemini_key
-def test_gather_context_returns_all_five_keys(db_session, project):
+def test_gather_context_returns_all_six_keys(db_session, project):
     # NOTE: this dev DB is seeded with REQ-001..REQ-050 (see backend/seed.py), so the
     # brief's original REQ-015/REQ-020 ids collide with the global UNIQUE(req_id, version)
     # constraint. Using out-of-range ids here to keep this test isolated from seed data.
@@ -45,7 +45,7 @@ def test_gather_context_returns_all_five_keys(db_session, project):
 
     context = gather_context(db_session, "REQ-9015")
 
-    assert set(context.keys()) == {"req_current", "req_previous", "tc_linked", "tc_related", "defect_history"}
+    assert set(context.keys()) == {"req_current", "req_previous", "tc_linked", "tc_related", "defect_history", "proposed_description"}
     assert context["req_current"].id == req_v2.id
     assert context["req_previous"].id == req_v1.id
     assert [t.id for t in context["tc_linked"]] == [tc.id]
