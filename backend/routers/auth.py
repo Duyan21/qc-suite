@@ -1,3 +1,6 @@
+import secrets
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -6,6 +9,8 @@ from models.base import get_db
 from schemas.auth import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     Token,
     UserLogin,
     UserRegister,
@@ -13,11 +18,19 @@ from schemas.auth import (
 )
 from services.auth_service import (
     create_access_token,
-    create_reset_token,
     get_current_user,
     hash_password,
     verify_password,
 )
+
+RESET_TOKEN_EXPIRE_MINUTES = 15
+
+
+def _utcnow() -> datetime:
+    # users.reset_token_exp is TIMESTAMP WITHOUT TIME ZONE, so SQLAlchemy
+    # round-trips it as a naive datetime — comparing against an aware
+    # datetime.now(timezone.utc) would raise TypeError, hence the strip here.
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -70,16 +83,40 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    # Always returns 200 with the same response shape whether or not the
+    # email exists, so a caller can't use this endpoint to enumerate accounts.
+    reset_token = secrets.token_urlsafe(32)
     user = db.query(User).filter(User.email == payload.email).first()
-    if user is None:
+    if user is not None:
+        user.reset_token = reset_token
+        user.reset_token_exp = _utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+        db.commit()
+
+    return ForgotPasswordResponse(
+        reset_token=reset_token,
+        expires_in=f"{RESET_TOKEN_EXPIRE_MINUTES} minutes",
+    )
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.reset_token == payload.token).first()
+    if (
+        user is None
+        or user.reset_token_exp is None
+        or user.reset_token_exp < _utcnow()
+    ):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired token",
         )
 
-    reset_token = create_reset_token(user.id)
-    print(f"[password-reset] email={user.email} token={reset_token}")
-    return ForgotPasswordResponse(reset_token=reset_token, expires_in_minutes=30)
+    user.hashed_password = hash_password(payload.new_password)
+    user.reset_token = None
+    user.reset_token_exp = None
+    db.commit()
+
+    return ResetPasswordResponse(message="Password reset successful")
 
 
 @router.get("/me", response_model=UserResponse)

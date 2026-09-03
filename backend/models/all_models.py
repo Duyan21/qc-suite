@@ -17,6 +17,8 @@ class User(Base):
     status = Column(String(20), default="Active")
     is_superadmin = Column(Boolean, default=False)
     can_create_projects = Column(Boolean, default=False)
+    reset_token = Column(String(64), nullable=True)
+    reset_token_exp = Column(TIMESTAMP, nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 
