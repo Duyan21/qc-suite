@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download } from 'lucide-react'
+import { Download, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -50,20 +50,25 @@ export function ReleaseReportPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  // Bumped by the manual reload button to re-fetch burndown + defects for the
+  // currently selected release, without touching selectedId/filter/page —
+  // those are the user's picks and must survive a manual reload.
+  const [refreshKey, setRefreshKey] = useState(0)
   const requestIdRef = useRef(0)
   const releasesRequestIdRef = useRef(0)
 
-  useEffect(() => {
-    if (!project) {
-      setReleases(null)
-      setSelectedId(null)
-      return
-    }
+  // preserveSelection=false clears the current pick first (used when the
+  // project changes — a release from another project can't stay selected).
+  // preserveSelection=true (manual reload) keeps whatever the user has
+  // selected, only falling back to the default if that release disappeared.
+  function loadReleases(projectId: number, preserveSelection: boolean) {
     const requestId = ++releasesRequestIdRef.current
     setError(null)
-    setReleases(null)
-    setSelectedId(null)
-    listReleases(project.id)
+    if (!preserveSelection) {
+      setReleases(null)
+      setSelectedId(null)
+    }
+    listReleases(projectId)
       .then((result) => {
         if (releasesRequestIdRef.current !== requestId) return
         setReleases(result)
@@ -76,6 +81,15 @@ export function ReleaseReportPage() {
         if (releasesRequestIdRef.current !== requestId) return
         setError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra')
       })
+  }
+
+  useEffect(() => {
+    if (!project) {
+      setReleases(null)
+      setSelectedId(null)
+      return
+    }
+    loadReleases(project.id, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id])
 
@@ -114,7 +128,7 @@ export function ReleaseReportPage() {
         if (requestIdRef.current !== requestId) return
         setLoading(false)
       })
-  }, [selectedId, project?.id])
+  }, [selectedId, project?.id, refreshKey])
 
   const selectedRelease = releases?.find((r) => r.id === selectedId) ?? null
 
@@ -172,6 +186,12 @@ export function ReleaseReportPage() {
     )
   }
 
+  function handleReload() {
+    if (!project) return
+    loadReleases(project.id, true)
+    setRefreshKey((k) => k + 1)
+  }
+
   function handleExport() {
     if (!selectedRelease || !project) return
     setExporting(true)
@@ -211,6 +231,16 @@ export function ReleaseReportPage() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            title="Tải lại dữ liệu"
+            disabled={!selectedRelease || loading}
+            onClick={handleReload}
+          >
+            <RefreshCw className={loading ? 'animate-spin' : ''} />
+          </Button>
           <Button type="button" variant="outline" disabled={!selectedRelease || exporting} onClick={handleExport}>
             <Download />
             {exporting ? 'Đang xuất...' : 'Xuất báo cáo (PDF)'}

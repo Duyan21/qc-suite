@@ -34,20 +34,36 @@ type NewDefectDialogProps = {
   projectId: number
   defaultSeverity: DefectSeverity
   onCreated: (defect: Defect) => void
+  // Pre-fill when opened from a release execution context (e.g. logging a
+  // defect straight from a Fail result), so the report's strict
+  // Defect.release_id filter actually picks it up without the user having
+  // to remember to set the release dropdown manually.
+  initialTestCase?: TestCaseSummary | null
+  initialReleaseId?: number | null
 }
 
-export function NewDefectDialog({ open, onOpenChange, projectId, defaultSeverity, onCreated }: NewDefectDialogProps) {
+export function NewDefectDialog({
+  open,
+  onOpenChange,
+  projectId,
+  defaultSeverity,
+  onCreated,
+  initialTestCase = null,
+  initialReleaseId = null,
+}: NewDefectDialogProps) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedRequirement, setSelectedRequirement] = useState<RequirementSummary | null>(null)
-  const [selectedTestCase, setSelectedTestCase] = useState<TestCaseSummary | null>(null)
+  const [selectedTestCase, setSelectedTestCase] = useState<TestCaseSummary | null>(initialTestCase)
   const [releases, setReleases] = useState<Release[]>([])
   const [members, setMembers] = useState<Member[]>([])
 
   useEffect(() => {
     if (!open) return
+    setSelectedTestCase(initialTestCase)
     listReleases(projectId).then(setReleases).catch(() => setReleases([]))
     listMembers(projectId).then(setMembers).catch(() => setMembers([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, projectId])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -161,7 +177,11 @@ export function NewDefectDialog({ open, onOpenChange, projectId, defaultSeverity
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="new-defect-release">Release (tìm thấy ở, tùy chọn)</Label>
-              <Select name="release_id" defaultValue={NONE_VALUE}>
+              <Select
+                key={initialReleaseId ?? NONE_VALUE}
+                name="release_id"
+                defaultValue={initialReleaseId != null ? String(initialReleaseId) : NONE_VALUE}
+              >
                 <SelectTrigger id="new-defect-release" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
