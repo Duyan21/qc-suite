@@ -19,6 +19,8 @@ import { BurndownChart } from '@/components/report/BurndownChart'
 import { DefectSeverityChart } from '@/components/report/DefectSeverityChart'
 import { DefectStatusChart } from '@/components/report/DefectStatusChart'
 import { DefectList } from '@/components/report/DefectList'
+import { GoNoGoBadge } from '@/components/report/GoNoGoBadge'
+import { computeGoNoGo } from '@/lib/goNoGo'
 
 const DEFECT_FETCH_LIMIT = 200
 
@@ -146,6 +148,15 @@ export function ReleaseReportPage() {
       ? Math.round((selectedRelease.pass_count / selectedRelease.total_test_cases) * 100)
       : 0
 
+  const goNoGoStatus = selectedRelease
+    ? computeGoNoGo({
+        passRate,
+        notRunCount: selectedRelease.not_run_count,
+        openCriticalCount: severityCounts.Critical,
+        openHighCount: severityCounts.High,
+      })
+    : null
+
   if (!project) {
     return <p className="px-4 text-sm text-muted-foreground">Vui lòng chọn một dự án.</p>
   }
@@ -183,7 +194,10 @@ export function ReleaseReportPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="font-heading text-xl font-semibold">Release Report</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="font-heading text-xl font-semibold">Release Report</h1>
+          {goNoGoStatus && <GoNoGoBadge status={goNoGoStatus} />}
+        </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Select value={selectedId ? String(selectedId) : undefined} onValueChange={(value) => setSelectedId(Number(value))}>
             <SelectTrigger className="w-full sm:w-64">
