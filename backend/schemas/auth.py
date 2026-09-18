@@ -20,6 +20,7 @@ class UserResponse(BaseModel):
     is_superadmin: bool
     can_create_projects: bool
     status: str
+    is_email_verified: bool
 
     class Config:
         from_attributes = True
@@ -30,6 +31,14 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class MessageResponse(BaseModel):
+    message: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
@@ -37,3 +46,8 @@ class ForgotPasswordRequest(BaseModel):
 class ForgotPasswordResponse(BaseModel):
     reset_token: str
     expires_in_minutes: int
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8)
