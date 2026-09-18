@@ -77,6 +77,7 @@ def test_suspended_user_cannot_login(client, db_session):
         email="suspended@example.com",
         hashed_password=hash_password("password123"),
         status="Suspended",
+        is_email_verified=True,
     )
     db_session.add(user)
     db_session.commit()
@@ -85,6 +86,42 @@ def test_suspended_user_cannot_login(client, db_session):
         "/auth/login", json={"email": "suspended@example.com", "password": "password123"}
     )
     assert response.status_code == 403
+
+
+def test_unverified_user_cannot_login(client, db_session):
+    from services.auth_service import hash_password
+
+    user = User(
+        email="unverified@example.com",
+        hashed_password=hash_password("password123"),
+        is_email_verified=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/login", json={"email": "unverified@example.com", "password": "password123"}
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Email not verified"
+
+
+def test_verified_user_can_login(client, db_session):
+    from services.auth_service import hash_password
+
+    user = User(
+        email="verified@example.com",
+        hashed_password=hash_password("password123"),
+        is_email_verified=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/login", json={"email": "verified@example.com", "password": "password123"}
+    )
+    assert response.status_code == 200
+    assert "access_token" in response.json()
 
 
 def test_invited_user_with_empty_password_gets_401_not_500(client, db_session):
