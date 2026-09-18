@@ -58,6 +58,26 @@ def register(payload: UserRegister, background_tasks: BackgroundTasks, db: Sessi
     return user
 
 
+@router.post("/verify-email", response_model=MessageResponse)
+def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.verification_token == payload.token).first()
+    if (
+        user is None
+        or user.verification_token_exp is None
+        or user.verification_token_exp < utcnow_naive()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link",
+        )
+
+    user.is_email_verified = True
+    user.verification_token = None
+    user.verification_token_exp = None
+    db.commit()
+    return MessageResponse(message="Email verified")
+
+
 @router.post("/login", response_model=Token)
 def login(payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()

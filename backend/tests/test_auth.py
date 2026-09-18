@@ -128,3 +128,49 @@ def test_register_creates_unverified_user_and_sends_email(client, db_session, mo
     assert sent["to_email"] == "new.user@example.com"
     assert sent["full_name"] == "New User"
     assert sent["token"] == created.verification_token
+
+
+def test_verify_email_with_valid_token_activates_account(client, db_session):
+    from services.auth_service import hash_password, utcnow_naive
+    from datetime import timedelta
+
+    user = User(
+        email="pending@example.com",
+        hashed_password=hash_password("password123"),
+        is_email_verified=False,
+        verification_token="valid-token-123",
+        verification_token_exp=utcnow_naive() + timedelta(hours=24),
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post("/auth/verify-email", json={"token": "valid-token-123"})
+    assert response.status_code == 200
+
+    db_session.refresh(user)
+    assert user.is_email_verified is True
+    assert user.verification_token is None
+    assert user.verification_token_exp is None
+
+
+def test_verify_email_with_expired_token_fails(client, db_session):
+    from services.auth_service import hash_password, utcnow_naive
+    from datetime import timedelta
+
+    user = User(
+        email="expired@example.com",
+        hashed_password=hash_password("password123"),
+        is_email_verified=False,
+        verification_token="expired-token",
+        verification_token_exp=utcnow_naive() - timedelta(hours=1),
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post("/auth/verify-email", json={"token": "expired-token"})
+    assert response.status_code == 400
+
+
+def test_verify_email_with_unknown_token_fails(client):
+    response = client.post("/auth/verify-email", json={"token": "does-not-exist"})
+    assert response.status_code == 400
