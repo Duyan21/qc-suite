@@ -78,6 +78,25 @@ def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)):
     return MessageResponse(message="Email verified")
 
 
+@router.post("/resend-verification", response_model=MessageResponse)
+def resend_verification(
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.email == payload.email).first()
+    if user is not None and not user.is_email_verified:
+        token = secrets.token_urlsafe(32)
+        user.verification_token = token
+        user.verification_token_exp = utcnow_naive() + timedelta(hours=TOKEN_EXPIRE_HOURS)
+        db.commit()
+        background_tasks.add_task(send_verification_email, user.email, user.full_name, token)
+
+    return MessageResponse(
+        message="Nếu tài khoản tồn tại và chưa xác thực, một email xác thực mới đã được gửi."
+    )
+
+
 @router.post("/login", response_model=Token)
 def login(payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()

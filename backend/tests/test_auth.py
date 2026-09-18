@@ -174,3 +174,60 @@ def test_verify_email_with_expired_token_fails(client, db_session):
 def test_verify_email_with_unknown_token_fails(client):
     response = client.post("/auth/verify-email", json={"token": "does-not-exist"})
     assert response.status_code == 400
+
+
+def test_resend_verification_issues_a_new_token_and_invalidates_the_old_one(client, db_session, monkeypatch):
+    from services.auth_service import hash_password, utcnow_naive
+    from datetime import timedelta
+
+    sent = []
+    monkeypatch.setattr(
+        "routers.auth.send_verification_email",
+        lambda to_email, full_name, token: sent.append(token),
+    )
+
+    user = User(
+        email="resend@example.com",
+        hashed_password=hash_password("password123"),
+        is_email_verified=False,
+        verification_token="old-token",
+        verification_token_exp=utcnow_naive() + timedelta(hours=24),
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post("/auth/resend-verification", json={"email": "resend@example.com"})
+    assert response.status_code == 200
+    assert len(sent) == 1
+    new_token = sent[0]
+    assert new_token != "old-token"
+
+    # the old token no longer verifies
+    old_response = client.post("/auth/verify-email", json={"token": "old-token"})
+    assert old_response.status_code == 400
+
+    # the new token does
+    new_response = client.post("/auth/verify-email", json={"token": new_token})
+    assert new_response.status_code == 200
+
+
+def test_resend_verification_is_a_generic_response_for_unknown_or_verified_email(client, db_session, test_user, monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        "routers.auth.send_verification_email",
+        lambda to_email, full_name, token: sent.append(token),
+    )
+
+    # test_user fixture has no is_email_verified set explicitly -> defaults
+    # False at the ORM level, so mark it verified first to exercise the
+    # "already verified" branch specifically.
+    test_user.is_email_verified = True
+    db_session.commit()
+
+    verified_response = client.post("/auth/resend-verification", json={"email": test_user.email})
+    assert verified_response.status_code == 200
+
+    unknown_response = client.post("/auth/resend-verification", json={"email": "nobody@example.com"})
+    assert unknown_response.status_code == 200
+
+    assert sent == []
