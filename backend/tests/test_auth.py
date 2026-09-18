@@ -101,3 +101,30 @@ def test_invited_user_with_empty_password_gets_401_not_500(client, db_session):
     )
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid email or password"
+
+
+def test_register_creates_unverified_user_and_sends_email(client, db_session, monkeypatch):
+    sent = {}
+
+    def fake_send(to_email, full_name, token):
+        sent["to_email"] = to_email
+        sent["full_name"] = full_name
+        sent["token"] = token
+
+    monkeypatch.setattr("routers.auth.send_verification_email", fake_send)
+
+    response = client.post(
+        "/auth/register",
+        json={"email": "new.user@example.com", "password": "password123", "full_name": "New User"},
+    )
+    assert response.status_code == 201
+    assert response.json()["is_email_verified"] is False
+
+    created = db_session.query(User).filter(User.email == "new.user@example.com").one()
+    assert created.is_email_verified is False
+    assert created.verification_token is not None
+    assert created.verification_token_exp is not None
+
+    assert sent["to_email"] == "new.user@example.com"
+    assert sent["full_name"] == "New User"
+    assert sent["token"] == created.verification_token

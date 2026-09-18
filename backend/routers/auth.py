@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import secrets
+from datetime import timedelta
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from models.all_models import User
@@ -6,24 +9,30 @@ from models.base import get_db
 from schemas.auth import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
+    MessageResponse,
+    ResetPasswordRequest,
     Token,
     UserLogin,
     UserRegister,
     UserResponse,
+    VerifyEmailRequest,
 )
 from services.auth_service import (
+    TOKEN_EXPIRE_HOURS,
     create_access_token,
     create_reset_token,
     get_current_user,
     hash_password,
+    utcnow_naive,
     verify_password,
 )
+from services.email_service import send_reset_email, send_verification_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: UserRegister, db: Session = Depends(get_db)):
+def register(payload: UserRegister, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing is not None:
         raise HTTPException(
@@ -32,15 +41,20 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
         )
 
     is_first_user = db.query(User).count() == 0
+    verification_token = secrets.token_urlsafe(32)
     user = User(
         email=payload.email,
         hashed_password=hash_password(payload.password),
         full_name=payload.full_name,
         is_superadmin=is_first_user,
+        is_email_verified=False,
+        verification_token=verification_token,
+        verification_token_exp=utcnow_naive() + timedelta(hours=TOKEN_EXPIRE_HOURS),
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+    background_tasks.add_task(send_verification_email, user.email, user.full_name, verification_token)
     return user
 
 
