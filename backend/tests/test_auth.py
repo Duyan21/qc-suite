@@ -201,6 +201,10 @@ def test_resend_verification_issues_a_new_token_and_invalidates_the_old_one(clie
     assert len(sent) == 1
     new_token = sent[0]
     assert new_token != "old-token"
+    assert (
+        response.json()["message"]
+        == "Nếu tài khoản tồn tại và chưa xác thực, một email xác thực mới đã được gửi."
+    )
 
     # the old token no longer verifies
     old_response = client.post("/auth/verify-email", json={"token": "old-token"})
@@ -229,5 +233,16 @@ def test_resend_verification_is_a_generic_response_for_unknown_or_verified_email
 
     unknown_response = client.post("/auth/resend-verification", json={"email": "nobody@example.com"})
     assert unknown_response.status_code == 200
+
+    # message text must be identical across both no-op branches, so neither
+    # account existence nor verification status can be enumerated from it
+    assert verified_response.json()["message"] == unknown_response.json()["message"]
+    # and identical to the message returned when a new token IS issued
+    # (test_resend_verification_issues_a_new_token_and_invalidates_the_old_one),
+    # so message content can't be used to distinguish any of the three cases
+    assert (
+        verified_response.json()["message"]
+        == "Nếu tài khoản tồn tại và chưa xác thực, một email xác thực mới đã được gửi."
+    )
 
     assert sent == []
