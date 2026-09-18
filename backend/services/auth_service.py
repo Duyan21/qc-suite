@@ -16,7 +16,6 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
-RESET_TOKEN_EXPIRE_MINUTES = 30
 TOKEN_EXPIRE_HOURS = 24
 
 
@@ -49,13 +48,6 @@ def create_access_token(user_id: int) -> str:
     return _create_token(
         {"sub": str(user_id), "type": "access"},
         timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS),
-    )
-
-
-def create_reset_token(user_id: int) -> str:
-    return _create_token(
-        {"sub": str(user_id), "type": "reset"},
-        timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES),
     )
 
 

@@ -283,3 +283,98 @@ def test_resend_verification_is_a_generic_response_for_unknown_or_verified_email
     )
 
     assert sent == []
+
+
+def test_forgot_password_sends_email_and_does_not_leak_token(client, db_session, test_user, monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        "routers.auth.send_reset_email",
+        lambda to_email, full_name, token: sent.append(token),
+    )
+
+    response = client.post("/auth/forgot-password", json={"email": test_user.email})
+    assert response.status_code == 200
+    assert "token" not in response.json()
+    assert response.json() == {"message": response.json()["message"]}  # only a message field
+    assert len(sent) == 1
+
+    db_session.refresh(test_user)
+    assert test_user.reset_token == sent[0]
+    assert test_user.reset_token_exp is not None
+
+
+def test_forgot_password_unknown_email_still_returns_200(client, monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        "routers.auth.send_reset_email",
+        lambda to_email, full_name, token: sent.append(token),
+    )
+
+    response = client.post("/auth/forgot-password", json={"email": "nobody@example.com"})
+    assert response.status_code == 200
+    assert sent == []
+
+
+def test_reset_password_with_valid_token_changes_password(client, db_session, test_user, monkeypatch):
+    monkeypatch.setattr("routers.auth.send_reset_email", lambda *a, **k: None)
+    client.post("/auth/forgot-password", json={"email": test_user.email})
+    db_session.refresh(test_user)
+    token = test_user.reset_token
+
+    response = client.post(
+        "/auth/reset-password", json={"token": token, "new_password": "newpassword456"}
+    )
+    assert response.status_code == 200
+
+    db_session.refresh(test_user)
+    assert test_user.reset_token is None
+    assert test_user.reset_token_exp is None
+
+    from services.auth_service import verify_password
+    assert verify_password("newpassword456", test_user.hashed_password)
+
+
+def test_only_latest_reset_token_works(client, db_session, test_user, monkeypatch):
+    tokens = []
+    monkeypatch.setattr(
+        "routers.auth.send_reset_email",
+        lambda to_email, full_name, token: tokens.append(token),
+    )
+
+    client.post("/auth/forgot-password", json={"email": test_user.email})
+    first_token = tokens[0]
+
+    client.post("/auth/forgot-password", json={"email": test_user.email})
+    second_token = tokens[1]
+    assert second_token != first_token
+
+    old_response = client.post(
+        "/auth/reset-password", json={"token": first_token, "new_password": "whatever123"}
+    )
+    assert old_response.status_code == 400
+
+    new_response = client.post(
+        "/auth/reset-password", json={"token": second_token, "new_password": "whatever123"}
+    )
+    assert new_response.status_code == 200
+
+
+def test_reset_password_with_expired_token_fails(client, db_session, test_user):
+    from services.auth_service import utcnow_naive
+    from datetime import timedelta
+
+    test_user.reset_token = "expired-reset-token"
+    test_user.reset_token_exp = utcnow_naive() - timedelta(hours=1)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/reset-password", json={"token": "expired-reset-token", "new_password": "whatever123"}
+    )
+    assert response.status_code == 400
+
+
+def test_reset_password_with_unknown_token_fails(client):
+    response = client.post(
+        "/auth/reset-password", json={"token": "does-not-exist", "new_password": "whatever123"}
+    )
+    assert response.status_code == 400
