@@ -25,6 +25,9 @@ export async function login(email: string, password: string): Promise<void> {
     })
     setToken(response.access_token)
   } catch (err) {
+    if (err instanceof Error && err.message === 'Email not verified') {
+      throw new Error('EMAIL_NOT_VERIFIED')
+    }
     throw toVietnameseError(err)
   }
 }
@@ -40,18 +43,32 @@ export async function register(name: string, email: string, password: string): P
   }
 }
 
+export async function verifyEmail(token: string): Promise<void> {
+  await apiFetch('/auth/verify-email', {
+    method: 'POST',
+    body: { token },
+  })
+}
+
+export async function resendVerification(email: string): Promise<void> {
+  await apiFetch('/auth/resend-verification', {
+    method: 'POST',
+    body: { email },
+  })
+}
+
 export async function requestPasswordReset(email: string): Promise<void> {
-  try {
-    await apiFetch('/auth/forgot-password', {
-      method: 'POST',
-      body: { email },
-    })
-  } catch (err) {
-    if (err instanceof Error && err.message === 'User not found') {
-      return
-    }
-    throw toVietnameseError(err)
-  }
+  await apiFetch('/auth/forgot-password', {
+    method: 'POST',
+    body: { email },
+  })
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  await apiFetch('/auth/reset-password', {
+    method: 'POST',
+    body: { token, new_password: newPassword },
+  })
 }
 
 export type CurrentUser = {
@@ -62,6 +79,7 @@ export type CurrentUser = {
   is_superadmin: boolean
   can_create_projects: boolean
   status: string
+  is_email_verified: boolean
 }
 
 export async function getCurrentUser(): Promise<CurrentUser> {
