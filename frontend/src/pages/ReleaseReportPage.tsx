@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download } from 'lucide-react'
+import { Download, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,6 +19,8 @@ import { BurndownChart } from '@/components/report/BurndownChart'
 import { DefectSeverityChart } from '@/components/report/DefectSeverityChart'
 import { DefectStatusChart } from '@/components/report/DefectStatusChart'
 import { DefectList } from '@/components/report/DefectList'
+import { GoNoGoBadge } from '@/components/report/GoNoGoBadge'
+import { computeGoNoGo } from '@/lib/goNoGo'
 
 const DEFECT_FETCH_LIMIT = 200
 
@@ -48,20 +50,25 @@ export function ReleaseReportPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  // Bumped by the manual reload button to re-fetch burndown + defects for the
+  // currently selected release, without touching selectedId/filter/page —
+  // those are the user's picks and must survive a manual reload.
+  const [refreshKey, setRefreshKey] = useState(0)
   const requestIdRef = useRef(0)
   const releasesRequestIdRef = useRef(0)
 
-  useEffect(() => {
-    if (!project) {
-      setReleases(null)
-      setSelectedId(null)
-      return
-    }
+  // preserveSelection=false clears the current pick first (used when the
+  // project changes — a release from another project can't stay selected).
+  // preserveSelection=true (manual reload) keeps whatever the user has
+  // selected, only falling back to the default if that release disappeared.
+  function loadReleases(projectId: number, preserveSelection: boolean) {
     const requestId = ++releasesRequestIdRef.current
     setError(null)
-    setReleases(null)
-    setSelectedId(null)
-    listReleases(project.id)
+    if (!preserveSelection) {
+      setReleases(null)
+      setSelectedId(null)
+    }
+    listReleases(projectId)
       .then((result) => {
         if (releasesRequestIdRef.current !== requestId) return
         setReleases(result)
@@ -74,6 +81,15 @@ export function ReleaseReportPage() {
         if (releasesRequestIdRef.current !== requestId) return
         setError(err instanceof Error ? err.message : 'Đã có lỗi xảy ra')
       })
+  }
+
+  useEffect(() => {
+    if (!project) {
+      setReleases(null)
+      setSelectedId(null)
+      return
+    }
+    loadReleases(project.id, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id])
 
@@ -112,7 +128,7 @@ export function ReleaseReportPage() {
         if (requestIdRef.current !== requestId) return
         setLoading(false)
       })
-  }, [selectedId, project?.id])
+  }, [selectedId, project?.id, refreshKey])
 
   const selectedRelease = releases?.find((r) => r.id === selectedId) ?? null
 
@@ -146,6 +162,15 @@ export function ReleaseReportPage() {
       ? Math.round((selectedRelease.pass_count / selectedRelease.total_test_cases) * 100)
       : 0
 
+  const goNoGoStatus = selectedRelease
+    ? computeGoNoGo({
+        passRate,
+        notRunCount: selectedRelease.not_run_count,
+        openCriticalCount: severityCounts.Critical,
+        openHighCount: severityCounts.High,
+      })
+    : null
+
   if (!project) {
     return <p className="px-4 text-sm text-muted-foreground">Vui lòng chọn một dự án.</p>
   }
@@ -159,6 +184,12 @@ export function ReleaseReportPage() {
         <p className="px-4 pb-4 text-sm text-muted-foreground">Chưa có release nào.</p>
       </Card>
     )
+  }
+
+  function handleReload() {
+    if (!project) return
+    loadReleases(project.id, true)
+    setRefreshKey((k) => k + 1)
   }
 
   function handleExport() {
@@ -183,7 +214,10 @@ export function ReleaseReportPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="font-heading text-xl font-semibold">Release Report</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="font-heading text-xl font-semibold">Release Report</h1>
+          {goNoGoStatus && <GoNoGoBadge status={goNoGoStatus} />}
+        </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Select value={selectedId ? String(selectedId) : undefined} onValueChange={(value) => setSelectedId(Number(value))}>
             <SelectTrigger className="w-full sm:w-64">
@@ -197,6 +231,16 @@ export function ReleaseReportPage() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            title="Tải lại dữ liệu"
+            disabled={!selectedRelease || loading}
+            onClick={handleReload}
+          >
+            <RefreshCw className={loading ? 'animate-spin' : ''} />
+          </Button>
           <Button type="button" variant="outline" disabled={!selectedRelease || exporting} onClick={handleExport}>
             <Download />
             {exporting ? 'Đang xuất...' : 'Xuất báo cáo (PDF)'}

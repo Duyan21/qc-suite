@@ -207,6 +207,7 @@ def invite_member(
             hashed_password="",
             full_name=payload.full_name,
             status="Invited",
+            is_email_verified=True,
         )
         db.add(user)
         db.flush()

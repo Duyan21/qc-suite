@@ -39,6 +39,11 @@ export function NewRequirementDialog({
   const [modules, setModules] = useState<Module[]>([])
   const [modulesLoading, setModulesLoading] = useState(false)
   const [moduleId, setModuleId] = useState<string>('')
+  const [invalidFields, setInvalidFields] = useState({
+    title: false,
+    description: false,
+    module: false,
+  })
 
   useEffect(() => {
     if (!open) return
@@ -54,12 +59,22 @@ export function NewRequirementDialog({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!moduleId) return
     const form = event.currentTarget
     const data = new FormData(form)
     const title = String(data.get('title') ?? '').trim()
     const description = String(data.get('description') ?? '').trim()
     const status = String(data.get('status') ?? 'Draft') as RequirementStatus
+
+    const nextInvalid = {
+      title: !title,
+      description: !description,
+      module: !moduleId,
+    }
+    if (nextInvalid.title || nextInvalid.description || nextInvalid.module) {
+      setInvalidFields(nextInvalid)
+      setError('Vui lòng điền đầy đủ các trường bắt buộc.')
+      return
+    }
 
     setSubmitting(true)
     setError(null)
@@ -73,6 +88,7 @@ export function NewRequirementDialog({
         status,
       })
       form.reset()
+      setInvalidFields({ title: false, description: false, module: false })
       onOpenChange(false)
       onCreated(requirement)
     } catch (err) {
@@ -83,7 +99,10 @@ export function NewRequirementDialog({
   }
 
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen) setError(null)
+    if (!nextOpen) {
+      setError(null)
+      setInvalidFields({ title: false, description: false, module: false })
+    }
     onOpenChange(nextOpen)
   }
 
@@ -92,40 +111,60 @@ export function NewRequirementDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Requirement mới</DialogTitle>
             <DialogDescription>Tạo một requirement mới cho dự án hiện tại.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-req-title">Tiêu đề</Label>
+              <Label htmlFor="new-req-title">Tiêu đề*</Label>
               <Input
                 id="new-req-title"
                 name="title"
                 required
+                aria-invalid={invalidFields.title}
+                onChange={(event) => {
+                  if (invalidFields.title && event.target.value.trim()) {
+                    setInvalidFields((prev) => ({ ...prev, title: false }))
+                  }
+                }}
                 placeholder="Nhập tiêu đề requirement..."
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-req-description">Mô tả</Label>
+              <Label htmlFor="new-req-description">Mô tả*</Label>
               <Textarea
                 id="new-req-description"
                 name="description"
                 required
+                aria-invalid={invalidFields.description}
+                onChange={(event) => {
+                  if (invalidFields.description && event.target.value.trim()) {
+                    setInvalidFields((prev) => ({ ...prev, description: false }))
+                  }
+                }}
                 rows={4}
                 placeholder="Mô tả chi tiết requirement..."
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="new-req-module">Module</Label>
+              <Label htmlFor="new-req-module">Module*</Label>
               <Select
                 value={moduleId}
-                onValueChange={setModuleId}
+                onValueChange={(value) => {
+                  setModuleId(value)
+                  setError(null)
+                  setInvalidFields((prev) => ({ ...prev, module: false }))
+                }}
                 disabled={modulesLoading || modules.length === 0}
               >
-                <SelectTrigger id="new-req-module" className="w-full">
-                  <SelectValue placeholder={modules.length === 0 ? 'Chưa có module' : undefined} />
+                <SelectTrigger
+                  id="new-req-module"
+                  className="w-full"
+                  aria-invalid={invalidFields.module}
+                >
+                  <SelectValue placeholder={modules.length === 0 ? 'Chưa có module' : 'Chọn module...'} />
                 </SelectTrigger>
                 <SelectContent>
                   {modules.map((m) => (

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from models.all_models import Defect, Project, Release, Requirement, TestCase, User
+from models.all_models import Defect, Project, Release, ReleaseTestCase, Requirement, TestCase, User
 from models.base import get_db
 from schemas.common import ReleaseSummary, RequirementSummary, TestCaseSummary
 from schemas.defects import (
@@ -81,7 +81,18 @@ def list_defects(
         if allowed_ids is not None:
             query = query.filter(Defect.project_id.in_(allowed_ids))
     if release_id is not None:
-        query = query.filter(Defect.release_id == release_id)
+        # A defect belongs to this release if it was explicitly tagged with
+        # release_id (the normal case going forward), OR it's linked to a
+        # test case that's a member of this release — covers defects logged
+        # before a "log defect from this release" flow existed, and anyone
+        # who logs one from the standalone Defects page without picking the
+        # release manually.
+        release_testcase_ids = db.query(ReleaseTestCase.testcase_id).filter(
+            ReleaseTestCase.release_id == release_id
+        )
+        query = query.filter(
+            or_(Defect.release_id == release_id, Defect.testcase_id.in_(release_testcase_ids))
+        )
     if severity is not None:
         query = query.filter(Defect.severity == severity)
     if status_filter is not None:
