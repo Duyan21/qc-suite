@@ -43,6 +43,7 @@ describe('VerifyEmailPage', () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ detail: 'Invalid or expired verification link' }, 400))
     renderAt('/verify-email?token=bad-token')
 
+    expect(await screen.findByText('Liên kết xác thực không hợp lệ hoặc đã hết hạn')).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('Login screen')).toBeInTheDocument()
     })
@@ -51,6 +52,7 @@ describe('VerifyEmailPage', () => {
   it('redirects to /login when there is no token at all', async () => {
     renderAt('/verify-email')
 
+    expect(await screen.findByText('Liên kết xác thực không hợp lệ hoặc đã hết hạn')).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('Login screen')).toBeInTheDocument()
     })

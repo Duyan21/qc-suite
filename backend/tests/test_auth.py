@@ -24,7 +24,8 @@ from models.all_models import (
 )
 
 
-def test_first_ever_user_becomes_superadmin(client, db_session):
+def test_first_ever_user_becomes_superadmin(client, db_session, monkeypatch):
+    monkeypatch.setattr("routers.auth.send_verification_email", lambda *a, **k: None)
     # This repo's tests run against a real shared dev DB, not a fresh DB per
     # run — the users table is very likely NOT empty (manually-registered
     # test accounts from earlier sprints). We're inside this test's own
@@ -60,7 +61,8 @@ def test_first_ever_user_becomes_superadmin(client, db_session):
     assert created.is_superadmin is True
 
 
-def test_second_user_is_not_superadmin(client, db_session, test_user):
+def test_second_user_is_not_superadmin(client, db_session, test_user, monkeypatch):
+    monkeypatch.setattr("routers.auth.send_verification_email", lambda *a, **k: None)
     response = client.post(
         "/auth/register",
         json={"email": "second@example.com", "password": "password123", "full_name": "Second User"},
@@ -378,3 +380,22 @@ def test_reset_password_with_unknown_token_fails(client):
         "/auth/reset-password", json={"token": "does-not-exist", "new_password": "whatever123"}
     )
     assert response.status_code == 400
+
+
+def test_wrong_password_on_unverified_account_is_401_not_403(client, db_session):
+    from services.auth_service import hash_password
+
+    user = User(
+        email="unverified.wrongpass@example.com",
+        hashed_password=hash_password("correctpassword123"),
+        is_email_verified=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "unverified.wrongpass@example.com", "password": "wrongpassword"},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid email or password"

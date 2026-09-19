@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { Button } from '@/components/ui/button'
@@ -17,8 +17,12 @@ export function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const ranRef = useRef(false)
 
   useEffect(() => {
+    if (ranRef.current) return
+    ranRef.current = true
+
     if (!token) {
       toast.error('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn')
       navigate('/login', { replace: true })

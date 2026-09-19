@@ -159,6 +159,9 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     user.hashed_password = hash_password(payload.new_password)
     user.reset_token = None
     user.reset_token_exp = None
+    user.is_email_verified = True
+    user.verification_token = None
+    user.verification_token_exp = None
     db.commit()
     return MessageResponse(message="Password reset successful")
 

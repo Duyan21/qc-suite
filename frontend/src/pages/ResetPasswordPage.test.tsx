@@ -33,6 +33,7 @@ afterEach(() => {
 describe('ResetPasswordPage', () => {
   it('redirects to /login immediately when there is no token', async () => {
     renderAt('/reset-password')
+    expect(await screen.findByText('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn')).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('Login screen')).toBeInTheDocument()
     })
@@ -73,6 +74,7 @@ describe('ResetPasswordPage', () => {
     await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'password123')
     await user.click(screen.getByRole('button', { name: /Đặt lại mật khẩu/ }))
 
+    expect(await screen.findByText('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn')).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('Login screen')).toBeInTheDocument()
     })

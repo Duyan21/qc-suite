@@ -58,10 +58,14 @@ export async function resendVerification(email: string): Promise<void> {
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  await apiFetch('/auth/forgot-password', {
-    method: 'POST',
-    body: { email },
-  })
+  try {
+    await apiFetch('/auth/forgot-password', {
+      method: 'POST',
+      body: { email },
+    })
+  } catch (err) {
+    throw toVietnameseError(err)
+  }
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
