@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,13 +7,13 @@ import { Label } from '@/components/ui/label'
 import { register } from '@/lib/auth'
 
 export function RegisterPage() {
-  const navigate = useNavigate()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [done, setDone] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -25,12 +25,27 @@ export function RegisterPage() {
     setLoading(true)
     try {
       await register(name, email, password)
-      navigate('/login', { replace: true })
+      setDone(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tạo tài khoản thất bại')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (done) {
+    return (
+      <AuthLayout>
+        <h1 className="text-lg font-semibold">Tạo tài khoản thành công</h1>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Vui lòng kiểm tra email để xác thực tài khoản trước khi đăng nhập. Link xác thực có
+          hiệu lực trong 24 giờ.
+        </p>
+        <Button asChild size="lg" className="mt-4 w-full bg-indigo-600 text-white hover:bg-indigo-700">
+          <Link to="/login">Quay lại đăng nhập</Link>
+        </Button>
+      </AuthLayout>
+    )
   }
 
   return (
