@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowDown, ArrowUp, ArrowUpDown, Bug, Plus, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,8 +22,6 @@ import {
 import { AddTestCasesDialog } from '@/components/AddTestCasesDialog'
 import { ExecuteTestCaseDialog } from '@/components/ExecuteTestCaseDialog'
 import { RemoveTestCaseDialog } from '@/components/RemoveTestCaseDialog'
-import { NewDefectDialog } from '@/components/NewDefectDialog'
-import type { TestCaseSummary } from '@/lib/testCases'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
@@ -90,7 +88,6 @@ export function ReleaseDetailPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [executeTarget, setExecuteTarget] = useState<{ id: number; code: string } | null>(null)
   const [removeTarget, setRemoveTarget] = useState<{ id: number; code: string } | null>(null)
-  const [defectTarget, setDefectTarget] = useState<TestCaseSummary | null>(null)
   const [historyTarget, setHistoryTarget] = useState<{ id: number; code: string } | null>(null)
   const [history, setHistory] = useState<ExecutionHistoryItem[] | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
@@ -283,15 +280,6 @@ export function ReleaseDetailPage() {
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        title="Log defect cho test case này"
-                        onClick={() => setDefectTarget(item.testcase)}
-                      >
-                        <Bug />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
                         title="Bỏ khỏi release"
                         onClick={() => setRemoveTarget({ id: item.testcase.id, code: item.testcase.code })}
                       >
@@ -373,23 +361,6 @@ export function ReleaseDetailPage() {
           load()
           setHistoryRefreshKey((k) => k + 1)
           toast.success('Đã lưu kết quả thực thi.')
-        }}
-      />
-      <NewDefectDialog
-        open={defectTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setDefectTarget(null)
-        }}
-        projectId={release.project_id}
-        defaultSeverity="Medium"
-        initialTestCase={defectTarget}
-        initialReleaseId={releaseId}
-        onCreated={(defect) => {
-          setDefectTarget(null)
-          toast.success(`Đã tạo defect ${defect.code}.`, {
-            href: `/defects/${defect.id}`,
-            linkLabel: 'Xem defect →',
-          })
         }}
       />
       <RemoveTestCaseDialog

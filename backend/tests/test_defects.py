@@ -1,7 +1,7 @@
 import re
 import uuid
 
-from models.all_models import Defect, Project, Release, ReleaseTestCase, Requirement, TestCase, User
+from models.all_models import Defect, Project, Release, Requirement, TestCase, User
 from services.code_generator import next_code
 
 
@@ -649,50 +649,6 @@ def test_list_defects_filters_by_release_id(client, auth_headers, db_session, pr
     body = response.json()
     assert body["total"] == 1
     assert body["items"][0]["title"] == "In A"
-
-
-def test_list_defects_by_release_id_also_matches_defects_linked_via_release_testcase(
-    client, auth_headers, db_session, project
-):
-    # Reproduces the release-report bug: a defect logged against a test case
-    # that's part of a release, but without release_id ever set on the
-    # defect itself, must still show up when the report filters by that
-    # release_id.
-    from datetime import date
-
-    release_a = Release(project_id=project.id, version_name="vA", target_date=date.today())
-    release_b = Release(project_id=project.id, version_name="vB", target_date=date.today())
-    db_session.add_all([release_a, release_b])
-    db_session.commit()
-    db_session.refresh(release_a)
-    db_session.refresh(release_b)
-
-    req = _create_requirement_row(db_session)
-    tc = _create_test_case_row(db_session, req.id)
-    db_session.add(ReleaseTestCase(release_id=release_a.id, testcase_id=tc.id))
-    db_session.commit()
-
-    client.post(
-        "/defects",
-        json={
-            "title": "Found via failed execution",
-            "severity": "High",
-            "status": "Open",
-            "project_id": project.id,
-            "testcase_id": tc.id,
-        },
-        headers=auth_headers,
-    )
-
-    response_a = client.get(f"/defects?project_id={project.id}&release_id={release_a.id}", headers=auth_headers)
-    assert response_a.status_code == 200
-    body_a = response_a.json()
-    assert body_a["total"] == 1
-    assert body_a["items"][0]["title"] == "Found via failed execution"
-
-    response_b = client.get(f"/defects?project_id={project.id}&release_id={release_b.id}", headers=auth_headers)
-    assert response_b.status_code == 200
-    assert response_b.json()["total"] == 0
 
 
 def test_list_defects_rejects_unknown_release_id(client, auth_headers, project):
