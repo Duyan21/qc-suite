@@ -16,6 +16,14 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
+TOKEN_EXPIRE_HOURS = 24
+
+
+def utcnow_naive() -> datetime:
+    # verification_token_exp / reset_token_exp are TIMESTAMP WITHOUT TIME ZONE,
+    # so SQLAlchemy round-trips them as naive datetimes — comparing against an
+    # aware datetime.now(timezone.utc) would raise TypeError, hence the strip.
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 # auto_error=False so a missing Authorization header falls through to our
 # own check instead of HTTPBearer's default 403 — DoD requires 401.

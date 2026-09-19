@@ -105,11 +105,13 @@ def seed_users(db, project):
         hashed_password=hash_password("changeme123"),
         full_name="Demo Admin",
         is_superadmin=True,
+        is_email_verified=True,
     )
     tester_user = User(
         email="tester@qcsuite.demo",
         hashed_password=hash_password("changeme123"),
         full_name="Demo Tester",
+        is_email_verified=True,
     )
     db.add_all([admin_user, tester_user])
     db.flush()
