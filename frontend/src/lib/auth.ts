@@ -5,6 +5,7 @@ export { getToken, clearToken } from './api'
 const ERROR_MESSAGES: Record<string, string> = {
   'Invalid email or password': 'Email hoặc mật khẩu không đúng',
   'Email already registered': 'Email đã được sử dụng',
+  'Invalid or expired token': 'Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
 }
 
 function toVietnameseError(err: unknown): Error {

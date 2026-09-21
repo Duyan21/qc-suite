@@ -11,7 +11,7 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -19,7 +19,7 @@ export function ForgotPasswordPage() {
     setLoading(true)
     try {
       await requestPasswordReset(email)
-      setSent(true)
+      setSubmitted(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gửi link reset thất bại')
     } finally {
@@ -32,10 +32,13 @@ export function ForgotPasswordPage() {
       <h1 className="text-lg font-semibold">Quên mật khẩu</h1>
       <p className="text-sm text-muted-foreground">Nhập email để nhận link reset mật khẩu</p>
 
-      {sent ? (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Nếu email tồn tại trong hệ thống, bạn sẽ nhận được link đặt lại mật khẩu trong ít phút.
-        </p>
+      {submitted ? (
+        <div className="mt-4 flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Nếu email tồn tại trong hệ thống, bạn sẽ nhận được link đặt lại mật khẩu trong ít
+            phút. Vui lòng kiểm tra hộp thư (kể cả mục spam).
+          </p>
+        </div>
       ) : (
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
