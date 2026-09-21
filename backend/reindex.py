@@ -1,4 +1,4 @@
-"""CLI script to embed any test cases missing a vector (S2-05).
+"""CLI script to embed any test cases missing a vector.
 
 Run from backend/ with the venv active and the DB up:
     python reindex.py

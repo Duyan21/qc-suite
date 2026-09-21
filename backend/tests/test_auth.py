@@ -28,7 +28,7 @@ def test_first_ever_user_becomes_superadmin(client, db_session, monkeypatch):
     monkeypatch.setattr("routers.auth.send_verification_email", lambda *a, **k: None)
     # This repo's tests run against a real shared dev DB, not a fresh DB per
     # run — the users table is very likely NOT empty (manually-registered
-    # test accounts from earlier sprints). We're inside this test's own
+    # manually-registered test accounts). We're inside this test's own
     # transaction (see conftest.py's db_session fixture docstring), so
     # clearing it here is fully safe and reversible: it never touches real
     # committed data, it just makes the "empty table" precondition true for
@@ -36,8 +36,8 @@ def test_first_ever_user_becomes_superadmin(client, db_session, monkeypatch):
     #
     # The shared dev DB also has committed project_members rows,
     # projects.lead_user_id values, releases.owner_user_id values, and
-    # release-run rows (added by the RBAC schema in tasks 1-4 and the Test
-    # Runs / Release Report seed data) that FK-reference existing users, so a
+    # release-run rows (added by the RBAC schema and the Test Runs / Release
+    # Report seed data) that FK-reference existing users, so a
     # plain `DELETE FROM users` fails with a ForeignKeyViolation. Clear those
     # referencing rows first — still entirely inside this test's own
     # transaction, still fully reversible.

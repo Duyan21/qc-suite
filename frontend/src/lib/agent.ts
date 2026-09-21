@@ -51,8 +51,8 @@ export async function analyseRequirementImpact(
   })
 }
 
-// Matches docs/agent_contract.example.json from the S3-0 plan. Lets the output UI
-// (Task 2) be built and manually verified before POST /agent/analyse exists.
+// Matches docs/agent_contract.example.json. Lets the output UI be built and
+// manually verified before POST /agent/analyse exists.
 export const MOCK_ANALYSIS_RESULT: AgentAnalysisResult = {
   req_id: 'REQ-015',
   version: 3,

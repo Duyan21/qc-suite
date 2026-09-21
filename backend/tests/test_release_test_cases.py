@@ -160,9 +160,8 @@ def test_removing_last_failing_test_case_can_complete_release(client, auth_heade
     rtc1.current_result = "Pass"
     rtc2.current_result = "Fail"
     db_session.commit()
-    # No execution-recording endpoint exists yet (Task 8) to keep release.status live;
-    # simulate what it will do so this test exercises the removal-triggers-recompute path
-    # in isolation rather than the unbuilt recording path.
+    # No execution-recording endpoint keeps release.status live; simulate what it
+    # would do so this test exercises the removal-triggers-recompute path in isolation.
     recompute_release_status(db_session, release)
     db_session.commit()
 

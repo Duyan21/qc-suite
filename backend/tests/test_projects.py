@@ -183,8 +183,6 @@ def test_member_actions_require_edit_on_members_roles(client, db_session, projec
     assert response.status_code == 403
 
 
-# --- Final whole-branch review fixes -------------------------------------
-
 from models.all_models import Project
 
 

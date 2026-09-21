@@ -1,6 +1,6 @@
 """add ondelete=SET NULL to requirements.module_id FK; case-insensitive unique index on modules
 
-Fixes two issues found in Task 2 code review of the modules CRUD API:
+Fixes two issues found in code review of the modules CRUD API:
 1. Deleting a module still referenced by a Deprecated (inactive) requirement raised a
    Postgres FK violation, since requirements.module_id had no ON DELETE behavior. The
    original app-level workaround (a bulk UPDATE nulling module_id before delete)

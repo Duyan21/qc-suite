@@ -1,4 +1,4 @@
-"""CLI script to populate the dev DB with demo data (Sprint 1 task S1-F).
+"""CLI script to populate the dev DB with demo data.
 
 Data is sourced from the Home Lending BRS and QA artifacts in
 docs/Home_lending/ (50 requirements across 6 modules, 300 test cases,

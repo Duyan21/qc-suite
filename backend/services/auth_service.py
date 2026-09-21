@@ -26,7 +26,7 @@ def utcnow_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 # auto_error=False so a missing Authorization header falls through to our
-# own check instead of HTTPBearer's default 403 — DoD requires 401.
+# own check instead of HTTPBearer's default 403 — unauthenticated requests must get 401.
 bearer_scheme = HTTPBearer(auto_error=False)
 
 

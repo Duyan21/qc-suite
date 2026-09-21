@@ -11,8 +11,8 @@ requires_real_gemini_key = pytest.mark.skipif(
 )
 
 
-# NOTE: this dev DB is seeded with REQ-001..REQ-050 (see backend/seed.py), so the
-# brief's original REQ-9040 id collides with the global UNIQUE(req_id, version)
+# NOTE: this dev DB is seeded with REQ-001..REQ-050 (see backend/seed.py), so a
+# low-numbered req_id would collide with the global UNIQUE(req_id, version)
 # constraint. Using an out-of-range id here to keep this test isolated from seed data
 # (same convention as test_agent_context_service.py / test_agent_prompt_service.py).
 def _make_requirement(db_session, project, req_id="REQ-9040", version=1, description="Login requires OTP verification via SMS."):

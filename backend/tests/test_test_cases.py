@@ -276,9 +276,6 @@ def _superadmin_headers(db_session):
     return {"Authorization": f"Bearer {create_access_token(admin.id)}"}
 
 
-# --- Final whole-branch review fixes -------------------------------------
-
-
 def _make_orphan(db_session):
     from models.all_models import TestCase
 

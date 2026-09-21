@@ -14,8 +14,8 @@ requires_real_gemini_key = pytest.mark.skipif(
 
 @requires_real_gemini_key
 def test_build_prompt_includes_requirement_and_contract_keys(db_session, project):
-    # NOTE: this dev DB is seeded with REQ-001..REQ-050 (see backend/seed.py), so the
-    # brief's original REQ-030/REQ-031 ids collide with the global UNIQUE(req_id, version)
+    # NOTE: this dev DB is seeded with REQ-001..REQ-050 (see backend/seed.py), so
+    # low-numbered req_ids would collide with the global UNIQUE(req_id, version)
     # constraint — using REQ-9xxx ids instead, per the same fix already applied in
     # test_agent_context_service.py.
     req = Requirement(
